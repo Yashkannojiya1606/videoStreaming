@@ -1,8 +1,12 @@
+
+
+
+
 {
   "name": "backend",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js"
@@ -11,15 +15,20 @@
   "author": "",
   "license": "ISC",
   "type": "module",
+  "engines": {
+    "node": "18.x"
+  },
   "dependencies": {
     "bcryptjs": "^3.0.2",
     "cors": "^2.8.5",
     "dotenv": "^17.2.2",
     "express": "^5.1.0",
-    "google-auth-library": "^10.3.0",
+    "google-auth-library": "^10.4.0",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.18.1",
-    "multer": "^2.0.2"
+    "multer": "^2.0.2",
+    "passport": "^0.7.0",
+    "passport-google-oauth20": "^2.0.0"
   },
   "devDependencies": {
     "nodemon": "^3.1.10"
