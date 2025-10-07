@@ -1,4 +1,3 @@
-
 // server.js
 import express from "express";
 import dotenv from "dotenv";
@@ -13,11 +12,23 @@ import userRoutes from "./routes/userRoutes.js";
 dotenv.config();
 const app = express();
 
-// ✅ CORS – use environment variable for frontend URL
+// ✅ CORS – allow local + production frontend
+const allowedOrigins = [
+  "http://localhost:5173", // local dev
+  process.env.FRONTEND_URL || "https://videostream.overair.in", // production
+];
+
 app.use(
   cors({
-    origin: process.env.FRONTEND_URL || "http://localhost:5173", 
-    credentials: true, 
+    origin: function (origin, callback) {
+      // allow requests with no origin (curl, Postman)
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS: " + origin));
+      }
+    },
+    credentials: true,
   })
 );
 
@@ -25,13 +36,13 @@ app.use(
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// ✅ Database connect
+// ✅ Connect to database
 connectDB();
 
 // ✅ Serve uploaded files statically
 app.use("/uploads", express.static(path.join(path.resolve(), "uploads")));
 
-// ✅ Streaming route for videos (Range support)
+// ✅ Streaming route for videos (supports partial content)
 app.get("/uploads/videos/:filename", (req, res) => {
   const __dirname = path.resolve();
   const filePath = path.join(__dirname, "uploads/videos", req.params.filename);
@@ -74,7 +85,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/videos", videoRoutes);
 app.use("/api/users", userRoutes);
 
-// ✅ Test route
+// ✅ Default route
 app.get("/", (req, res) => {
   res.send("API is running...");
 });
@@ -86,6 +97,6 @@ app.get("/health", (req, res) => {
 
 // ✅ Start server (Render requires binding to 0.0.0.0)
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, "0.0.0.0", () =>
-  console.log(`✅ Server running on port ${PORT}`)
-);
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`✅ Server running on port ${PORT}`);
+});
