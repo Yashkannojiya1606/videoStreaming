@@ -4,13 +4,19 @@ import dotenv from "dotenv";
 import cors from "cors";
 import path from "path";
 import fs from "fs";
+import { fileURLToPath } from "url";
 import connectDB from "./config/db.js";
 import authRoutes from "./routes/authRoutes.js";
 import videoRoutes from "./routes/videoRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
 
 dotenv.config();
+
 const app = express();
+
+// ✅ Resolve current directory (ESM-compatible)
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // ✅ CORS – allow local + production frontend
 const allowedOrigins = [
@@ -21,7 +27,7 @@ const allowedOrigins = [
 app.use(
   cors({
     origin: function (origin, callback) {
-      // allow requests with no origin (curl, Postman)
+      // allow requests with no origin (Postman, curl, etc.)
       if (!origin || allowedOrigins.includes(origin)) {
         callback(null, true);
       } else {
@@ -36,21 +42,20 @@ app.use(
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// ✅ Connect to database
+// ✅ Connect to MongoDB
 connectDB();
 
-// ✅ Serve uploaded files statically
-app.use("/uploads", express.static(path.join(path.resolve(), "uploads")));
+// ✅ Serve uploaded files (thumbnails, avatars, etc.)
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
-// ✅ Streaming route for videos (supports partial content)
+// ✅ Custom streaming route for large video files
 app.get("/uploads/videos/:filename", (req, res) => {
-  const __dirname = path.resolve();
   const filePath = path.join(__dirname, "uploads/videos", req.params.filename);
 
   fs.stat(filePath, (err, stats) => {
     if (err) {
-      console.error(err);
-      return res.status(404).end("File not found");
+      console.error("❌ Video not found:", filePath);
+      return res.status(404).send("Video not found");
     }
 
     const range = req.headers.range;
@@ -80,7 +85,7 @@ app.get("/uploads/videos/:filename", (req, res) => {
   });
 });
 
-// ✅ Routes
+// ✅ API Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/videos", videoRoutes);
 app.use("/api/users", userRoutes);
@@ -90,12 +95,12 @@ app.get("/", (req, res) => {
   res.send("API is running...");
 });
 
-// ✅ Health check route (for Render)
+// ✅ Health check for Render
 app.get("/health", (req, res) => {
   res.json({ ok: true });
 });
 
-// ✅ Start server (Render requires binding to 0.0.0.0)
+// ✅ Start the server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`✅ Server running on port ${PORT}`);
