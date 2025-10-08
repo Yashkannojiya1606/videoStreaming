@@ -302,7 +302,9 @@ router.post(
         req.body;
 
       if (!title || !category) {
-        return res.status(400).json({ error: "Title and category are required" });
+        return res
+          .status(400)
+          .json({ error: "Title and category are required" });
       }
 
       const videoFile = req.files.video[0];
@@ -353,37 +355,14 @@ router.post(
   }
 );
 
-// ✅ Get all videos
-router.get("/", async (req, res) => {
-  try {
-    const videos = await Video.find().sort({ createdAt: -1 });
-    res.json(videos);
-  } catch (err) {
-    console.error("Fetch videos error:", err);
-    res.status(500).json({ error: "Failed to fetch videos" });
-  }
-});
-
-// ✅ Get single video by ID
-router.get("/:id", async (req, res) => {
-  try {
-    const video = await Video.findById(req.params.id);
-    if (!video) return res.status(404).json({ error: "Video not found" });
-    res.json(video);
-  } catch (err) {
-    console.error("Fetch single video error:", err);
-    if (err.name === "CastError")
-      return res.status(400).json({ error: "Invalid video ID" });
-    res.status(500).json({ error: "Failed to fetch video" });
-  }
-});
-
-// 🧹 Cleanup route — delete non-S3 videos (safe)
+// ⚠️ Keep cleanup route ABOVE “/:id” route
 router.delete("/cleanup", async (req, res) => {
   try {
     const result = await Video.deleteMany({
       videoUrl: {
-        $not: { $regex: /^https:\/\/overairstream\.s3\.ap-south-1\.amazonaws\.com/ },
+        $not: {
+          $regex: /^https:\/\/overairstream\.s3\.ap-south-1\.amazonaws\.com/,
+        },
       },
     });
 
@@ -395,6 +374,31 @@ router.delete("/cleanup", async (req, res) => {
   } catch (error) {
     console.error("❌ Error cleaning videos:", error);
     res.status(500).json({ success: false, message: "Server error" });
+  }
+});
+
+// ✅ Get all videos
+router.get("/", async (req, res) => {
+  try {
+    const videos = await Video.find().sort({ createdAt: -1 });
+    res.json(videos);
+  } catch (err) {
+    console.error("Fetch videos error:", err);
+    res.status(500).json({ error: "Failed to fetch videos" });
+  }
+});
+
+// ✅ Get single video by ID (⚠️ keep this last)
+router.get("/:id", async (req, res) => {
+  try {
+    const video = await Video.findById(req.params.id);
+    if (!video) return res.status(404).json({ error: "Video not found" });
+    res.json(video);
+  } catch (err) {
+    console.error("Fetch single video error:", err);
+    if (err.name === "CastError")
+      return res.status(400).json({ error: "Invalid video ID" });
+    res.status(500).json({ error: "Failed to fetch video" });
   }
 });
 
