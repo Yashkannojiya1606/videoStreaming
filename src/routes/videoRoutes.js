@@ -207,7 +207,7 @@ router.post(
       };
       const uploadedVideo = await s3.upload(videoParams).promise();
 
-      // Upload thumbnail to S3
+      // Upload thumbnail to S3 
       const thumbParams = {
         Bucket: process.env.S3_BUCKET_NAME,
         Key: `thumbnails/${Date.now()}-${thumbnailFile.originalname}`,
@@ -218,7 +218,7 @@ router.post(
       const uploadedThumbnail = await s3.upload(thumbParams).promise();
 
       // Save video metadata in DB
-      const newVideo = new Video({
+      const newVideo = new Video({ 
         title,
         description: description || "",
         videoUrl: uploadedVideo.Location,

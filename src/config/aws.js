@@ -1,4 +1,3 @@
-// backend/config/aws.js
 import AWS from "aws-sdk";
 
 AWS.config.update({
