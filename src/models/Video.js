@@ -12,6 +12,9 @@ const videoSchema = new mongoose.Schema(
     authorName: { type: String, default: "Unknown" },   // NEW
     authorAvatar: { type: String, default: "" },        // NEW
     views: { type: Number, default: 0 },
+    likeCount: { type: Number, default: 0 },
+    commentCount: { type: Number, default: 0 },
+
   },
   { timestamps: true }
 );

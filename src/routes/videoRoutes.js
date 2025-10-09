@@ -258,6 +258,8 @@ import multer from "multer";
 import Video from "../models/Video.js";
 import { protect } from "../middleware/authMiddleware.js";
 import s3 from "../config/aws.js";
+import { toggleLike, isLiked } from "../controllers/likeController.js";
+import { addComment, getComments, deleteComment } from "../controllers/commentController.js";
 
 const router = express.Router();
 
@@ -270,7 +272,7 @@ const upload = multer({
     if (file.fieldname === "video" && file.mimetype.startsWith("video/")) {
       cb(null, true);
     } else if (
-      file.fieldname === "thumbnail" &&
+      file.fieldname === "thumbnail" &&    
       (file.mimetype.startsWith("image/") ||
         file.mimetype === "image/jpeg" ||
         file.mimetype === "image/png")
@@ -388,7 +390,7 @@ router.get("/", async (req, res) => {
   }
 });
 
-// ✅ Get single video by ID (⚠️ keep this last)
+// ✅ Get single video by ID (⚠️ keep this last)   
 router.get("/:id", async (req, res) => {
   try {
     const video = await Video.findById(req.params.id);
@@ -398,8 +400,19 @@ router.get("/:id", async (req, res) => {
     console.error("Fetch single video error:", err);
     if (err.name === "CastError")
       return res.status(400).json({ error: "Invalid video ID" });
-    res.status(500).json({ error: "Failed to fetch video" });
+    res.status(500).json({ error: "Failed to fetch video" });   
   }
+
+
+
+  // like
+router.post("/:id/like", protect, toggleLike);
+router.get("/:id/isLiked", protect, isLiked);
+
+// comments
+router.post("/:id/comments", protect, addComment);
+router.get("/:id/comments", getComments);
+router.delete("/comments/:commentId", protect, deleteComment);
 });
 
 export default router;
