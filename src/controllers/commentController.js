@@ -10,6 +10,10 @@ export const addComment = async (req, res) => {
     const video = await Video.findById(videoId);
     if (!video) return res.status(404).json({ error: "Video not found" });
 
+
+      // 🔍 STEP 4: Debug log to verify user info from middleware
+    console.log("req.user in addComment:", req.user);
+
     const newComment = await Comment.create({
       videoId,
       userId: req.user.id,
