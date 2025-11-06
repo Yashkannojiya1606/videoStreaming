@@ -109,48 +109,171 @@
 
 
 // src/server.js
+// import express from "express";
+// import dotenv from "dotenv";
+// import cors from "cors";
+// import path from "path";
+// import fs from "fs";
+// import { createServer } from "http";
+// import { Server } from "socket.io";
+// import connectDB from "./config/db.js";
+// import authRoutes from "./routes/authRoutes.js";
+// import videoRoutes from "./routes/videoRoutes.js";
+// import userRoutes from "./routes/userRoutes.js";
+// import likeRoutes from "./routes/likeRoutes.js"; // 👈 added
+// import commentRoutes from "./routes/commentRoutes.js";
+
+
+// dotenv.config();
+// const app = express();
+
+// // CORS
+// const allowedOrigins = [
+//   process.env.CLIENT_URL || "https://videostream.overair.in",
+//   "http://localhost:5173",
+// ];
+// app.use(cors({ origin: allowedOrigins, credentials: true }));
+// app.use(express.json());
+// app.use(express.urlencoded({ extended: true }));
+
+// connectDB();
+
+// // static and routes as before
+// app.use("/uploads", express.static(path.join(path.resolve(), "uploads")));
+// app.use("/api/auth", authRoutes);
+// app.use("/api/videos", videoRoutes);
+// app.use("/api/users", userRoutes);
+// app.use("/api/likes", likeRoutes); // 👈 added here
+// app.use("/api/comments", commentRoutes);
+
+
+// app.get("/", (req, res) => res.send("API is running..."));
+// app.get("/health", (req, res) => res.json({ ok: true }));
+
+// // create HTTP server and Socket.IO server
+// const httpServer = createServer(app);
+// const io = new Server(httpServer, {
+//   cors: {
+//     origin: allowedOrigins,
+//     methods: ["GET", "POST"],
+//     credentials: true,
+//   },
+// });
+
+// // attach io instance to express app so controllers can access it
+// app.set("io", io);
+
+// // Socket events: join room, leave, etc.
+// io.on("connection", (socket) => {
+//   console.log("Socket connected:", socket.id);
+
+//   socket.on("joinVideo", (videoId) => {
+//     socket.join(videoId);
+//     console.log(`Socket ${socket.id} joined room ${videoId}`);
+//   });
+
+//   socket.on("leaveVideo", (videoId) => {
+//     socket.leave(videoId);
+//   });
+
+//   socket.on("disconnect", () => {
+//     console.log("Socket disconnected:", socket.id);
+//   });
+// });
+
+// // listen
+// const PORT = process.env.PORT || 5000;
+// httpServer.listen(PORT, "0.0.0.0", () => {
+//   console.log(`Server + Socket.IO listening on port ${PORT}`);
+// });
+
+
+// // code ends here 
+
+
+
+
 import express from "express";
 import dotenv from "dotenv";
 import cors from "cors";
 import path from "path";
-import fs from "fs";
 import { createServer } from "http";
 import { Server } from "socket.io";
 import connectDB from "./config/db.js";
+
+// Routes
 import authRoutes from "./routes/authRoutes.js";
 import videoRoutes from "./routes/videoRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
-import likeRoutes from "./routes/likeRoutes.js"; // 👈 added
+import likeRoutes from "./routes/likeRoutes.js";
 import commentRoutes from "./routes/commentRoutes.js";
-
 
 dotenv.config();
 const app = express();
 
-// CORS
+// ✅ Parse JSON and form data
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ extended: true, limit: "50mb" }));
+
+// ✅ Allowed origins (for both local + production)
 const allowedOrigins = [
   process.env.CLIENT_URL || "https://videostream.overair.in",
   "http://localhost:5173",
+  "https://videostreaming-rns0.onrender.com",
 ];
-app.use(cors({ origin: allowedOrigins, credentials: true }));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
 
+// ✅ CORS setup
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        console.warn("❌ Blocked by CORS:", origin);
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    credentials: true,
+  })
+);
+
+// ✅ Database connection
 connectDB();
 
-// static and routes as before
+// ✅ Static files (videos, thumbnails, etc.)
 app.use("/uploads", express.static(path.join(path.resolve(), "uploads")));
+
+// ✅ Main API routes
 app.use("/api/auth", authRoutes);
 app.use("/api/videos", videoRoutes);
 app.use("/api/users", userRoutes);
-app.use("/api/likes", likeRoutes); // 👈 added here
+app.use("/api/likes", likeRoutes);
 app.use("/api/comments", commentRoutes);
 
-
+// ✅ Health + root routes
 app.get("/", (req, res) => res.send("API is running..."));
 app.get("/health", (req, res) => res.json({ ok: true }));
 
-// create HTTP server and Socket.IO server
+// ✅ Handle 404 routes
+// app.use("*", (req, res) => {
+//   res.status(404).json({ message: "Route not found" });
+// });
+// ✅ Add this instead:
+app.use((req, res) => {
+  res.status(404).json({ message: "Route not found" });
+});
+
+// ✅ Global error handler (for debugging)
+app.use((err, req, res, next) => {
+  console.error("🔥 Global Error Handler:", err.stack);
+  res.status(500).json({
+    message: "Internal Server Error",
+    error: err.message,
+  });
+});
+
+// ✅ Create HTTP + Socket.IO server
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: {
@@ -160,16 +283,16 @@ const io = new Server(httpServer, {
   },
 });
 
-// attach io instance to express app so controllers can access it
+// ✅ Make socket accessible to controllers if needed
 app.set("io", io);
 
-// Socket events: join room, leave, etc.
+// ✅ Socket.IO events
 io.on("connection", (socket) => {
-  console.log("Socket connected:", socket.id);
+  console.log("🟢 Socket connected:", socket.id);
 
   socket.on("joinVideo", (videoId) => {
     socket.join(videoId);
-    console.log(`Socket ${socket.id} joined room ${videoId}`);
+    console.log(`📺 Socket ${socket.id} joined room ${videoId}`);
   });
 
   socket.on("leaveVideo", (videoId) => {
@@ -177,15 +300,12 @@ io.on("connection", (socket) => {
   });
 
   socket.on("disconnect", () => {
-    console.log("Socket disconnected:", socket.id);
+    console.log("🔴 Socket disconnected:", socket.id);
   });
 });
 
-// listen
+// ✅ Start server (works locally + Render)
 const PORT = process.env.PORT || 5000;
 httpServer.listen(PORT, "0.0.0.0", () => {
-  console.log(`Server + Socket.IO listening on port ${PORT}`);
+  console.log(`🚀 Server + Socket.IO running on port ${PORT}`);
 });
-
-
-// code ends here 

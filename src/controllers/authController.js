@@ -393,7 +393,17 @@ export const registerUser = async (req, res) => {
       return res.status(400).json({ message: "User already exists" });
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    const username = email.split("@")[0];
+    // const username = email.split("@")[0];
+    let baseUsername = email.split("@")[0];
+let username = baseUsername;
+let counter = 1;
+
+// ensure unique username
+while (await User.findOne({ username })) {
+  username = `${baseUsername}${counter}`;
+  counter++;
+}
+
 
     const newUser = await User.create({
       name,

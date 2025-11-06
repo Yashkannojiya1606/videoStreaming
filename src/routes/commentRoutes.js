@@ -16,6 +16,9 @@
 // export default router;
 
 
+// D:\video-streaming-overair\video-streaming-overair\backend\src\routes\commentRoutes.js
+
+
 import express from "express";
 import { addComment, getComments, deleteComment } from "../controllers/commentController.js";
 import { protect } from "../middleware/authMiddleware.js";
