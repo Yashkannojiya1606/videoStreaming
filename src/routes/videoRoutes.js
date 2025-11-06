@@ -340,6 +340,44 @@ router.get("/search/:query", async (req, res) => {
 router.get("/my-videos", protect, getMyVideos);
 
 // 🎥 Get single video by ID
+// router.get("/:id", async (req, res) => {
+//   const { id } = req.params;
+//   if (!mongoose.Types.ObjectId.isValid(id)) {
+//     return res.status(400).json({ error: "Invalid video ID format" });
+//   }
+
+//   try {
+//     const video = await Video.findById(id);
+//     if (!video) return res.status(404).json({ error: "Video not found" });
+//     res.json(video);
+//   } catch (err) {
+//     console.error("Fetch single video error:", err);
+//     res.status(500).json({ error: "Failed to fetch video" });
+//   }
+// });
+// // ✅ Delete video by ID (only if it belongs to logged-in user)
+// router.delete("/:id", protect, async (req, res) => {
+//   try {
+//     const video = await Video.findById(req.params.id);
+
+//     if (!video) {
+//       return res.status(404).json({ message: "Video not found" });
+//     }
+
+//     // Ensure only the owner can delete
+//     if (video.userId.toString() !== req.user.id) {
+//       return res.status(403).json({ message: "You are not authorized to delete this video" });
+//     }
+
+//     await Video.findByIdAndDelete(req.params.id);
+//     res.json({ message: "Video deleted successfully" });
+//   } catch (err) {
+//     console.error("Error deleting video:", err);
+//     res.status(500).json({ message: "Failed to delete video", error: err.message });
+//   }
+// });
+
+// 🎥 Get single video by ID
 router.get("/:id", async (req, res) => {
   const { id } = req.params;
   if (!mongoose.Types.ObjectId.isValid(id)) {
@@ -356,6 +394,49 @@ router.get("/:id", async (req, res) => {
   }
 });
 
-export default router;
+// 🗑️ Delete video by ID (Protected + S3 cleanup)
+router.delete("/:id", protect, async (req, res) => {
+  try {
+    const video = await Video.findById(req.params.id);
+    if (!video) {
+      return res.status(404).json({ message: "Video not found" });
+    }
 
-      
+    // Ensure only owner can delete
+    if (video.userId.toString() !== req.user.id) {
+      return res.status(403).json({ message: "Not authorized to delete this video" });
+    }
+
+    // Extract S3 object keys
+    const videoKey = video.videoUrl.split(".amazonaws.com/")[1];
+    const thumbKey = video.thumbnailUrl.split(".amazonaws.com/")[1];
+
+    // Delete from S3 (optional but recommended)
+    try {
+      await s3
+        .deleteObjects({
+          Bucket: process.env.S3_BUCKET_NAME,
+          Delete: {
+            Objects: [
+              { Key: videoKey },
+              { Key: thumbKey },
+            ],
+          },
+        })
+        .promise();
+      console.log("✅ S3 files deleted successfully");
+    } catch (s3Err) {
+      console.warn("⚠️ Failed to delete from S3:", s3Err.message);
+    }
+
+    // Delete from MongoDB
+    await Video.findByIdAndDelete(req.params.id);
+
+    res.json({ message: "Video and files deleted successfully" });
+  } catch (err) {
+    console.error("❌ Delete video error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+export default router;
