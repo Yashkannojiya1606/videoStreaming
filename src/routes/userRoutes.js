@@ -118,7 +118,7 @@ router.put("/profile", upload.single("avatar"), async (req, res) => {
         Key: `avatars/${fileName}`, // auto-create avatars/ folder
         Body: req.file.buffer,
         ContentType: req.file.mimetype,
-        ACL: "public-read", // make file publicly accessible
+        // ACL: "public-read", // 
       };
 
       // Upload the file to S3
