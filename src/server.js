@@ -216,13 +216,35 @@ app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
 // ✅ Allowed origins (for both local + production)
+// const allowedOrigins = [
+//   process.env.CLIENT_URL || "https://videostream.overair.in",
+//   "http://localhost:5173",
+//   "https://videostreaming-rns0.onrender.com",
+// ];
+
+// // ✅ CORS setup
+// app.use(
+//   cors({
+//     origin: function (origin, callback) {
+//       if (!origin || allowedOrigins.includes(origin)) {
+//         callback(null, true);
+//       } else {
+//         console.warn("❌ Blocked by CORS:", origin);
+//         callback(new Error("Not allowed by CORS"));
+//       }
+//     },
+//     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+//     credentials: true,
+//   })
+// );
+// ✅ Allowed origins (include both non-www and www)
 const allowedOrigins = [
-  process.env.CLIENT_URL || "https://videostream.overair.in",
   "http://localhost:5173",
+  "https://videostream.overair.in",
+  "https://www.videostream.overair.in",
   "https://videostreaming-rns0.onrender.com",
 ];
 
-// ✅ CORS setup
 app.use(
   cors({
     origin: function (origin, callback) {
@@ -237,6 +259,7 @@ app.use(
     credentials: true,
   })
 );
+
 
 // ✅ Database connection
 connectDB();
