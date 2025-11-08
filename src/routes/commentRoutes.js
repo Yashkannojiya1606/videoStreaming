@@ -16,7 +16,7 @@
 // export default router;
 
 
-// D:\video-streaming-overair\video-streaming-overair\backend\src\routes\commentRoutes.js
+// backend\src\routes\commentRoutes.js
 
 
 import express from "express";
