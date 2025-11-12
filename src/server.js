@@ -167,11 +167,13 @@ app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
 // ✅ Allowed origins (include both www & non-www)
 const allowedOrigins = [
-  "http://localhost:5173",
-  "https://videostream.overair.in",
-  "https://www.videostream.overair.in",
+ "http://localhost:5173",
+  "https://bharatvids.com",
+  "https://www.bharatvids.com",
+  // "https://videostream.overair.in",
+  // "https://www.videostream.overair.in",
   "https://videostreaming-rns0.onrender.com",
-];
+]; 
 
 app.use(
   cors({
