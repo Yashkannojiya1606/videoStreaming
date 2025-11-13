@@ -157,6 +157,8 @@ import userRoutes from "./routes/userRoutes.js";
 import likeRoutes from "./routes/likeRoutes.js";
 import commentRoutes from "./routes/commentRoutes.js";
 import subscriptionRoutes from "./routes/subscriptionRoutes.js"; // ✅ NEW
+import historyRoutes from "./routes/historyRoutes.js";
+
 
 dotenv.config();
 const app = express();
@@ -203,6 +205,7 @@ app.use("/api/users", userRoutes);
 app.use("/api/likes", likeRoutes);
 app.use("/api/comments", commentRoutes);
 app.use("/api/subscriptions", subscriptionRoutes); // ✅ MOUNTED HERE
+app.use("/api/history", historyRoutes);
 
 // ✅ Health check
 app.get("/", (req, res) => res.send("API is running..."));

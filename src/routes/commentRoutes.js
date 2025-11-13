@@ -20,7 +20,9 @@
 
 
 import express from "express";
-import { addComment, getComments, deleteComment } from "../controllers/commentController.js";
+import { addComment, getComments, deleteComment,
+  likeComment,   
+  dislikeComment, } from "../controllers/commentController.js";
 import { protect } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
@@ -29,5 +31,9 @@ const router = express.Router();
 router.post("/:id", protect, addComment);
 router.get("/:id", getComments);
 router.delete("/:commentId", protect, deleteComment);
+
+router.put("/:commentId/like", protect, likeComment);
+router.put("/:commentId/dislike", protect, dislikeComment);
+
 
 export default router;

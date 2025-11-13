@@ -75,11 +75,116 @@
 // new changes as per the 8 nov for render same name in comment as well as channel 
 
 
+// import Comment from "../models/Comment.js";
+// import Video from "../models/Video.js";
+// import User from "../models/User.js"; // ✅ Import User model to fetch fresh data
+
+// // ✅ Add a comment
+// export const addComment = async (req, res) => {
+//   try {
+//     const { text } = req.body;
+//     const videoId = req.params.id;
+
+//     const video = await Video.findById(videoId);
+//     if (!video) return res.status(404).json({ error: "Video not found" });
+
+//     // ✅ Fetch the latest user details from DB
+//     const user = await User.findById(req.user.id).select("name username avatar");
+//     if (!user) return res.status(404).json({ error: "User not found" });
+
+//     // ✅ Create comment with updated name & avatar
+//     const newComment = await Comment.create({
+//       videoId,
+//       userId: user._id,
+//       username: user.name || user.username, // use display name if available
+//       userAvatar: user.avatar || "",
+//       text,
+//     });
+
+//     // ✅ Emit real-time update
+//     const io = req.app.get("io");
+//     if (io) io.to(videoId).emit("commentAdded", newComment);
+
+//     res.status(201).json(newComment);
+//   } catch (err) {
+//     console.error("addComment error:", err);
+//     res.status(500).json({ error: "Server error" });
+//   }
+// };
+
+// // ✅ Get all comments for a video older version
+// // export const getComments = async (req, res) => {
+// //   try {
+// //     const videoId = req.params.id;
+// //     const comments = await Comment.find({ videoId }).sort({ createdAt: -1 });
+// //     res.json(comments);
+// //   } catch (err) {
+// //     console.error("getComments error:", err);
+// //     res.status(500).json({ error: "Server error" });
+// //   }
+// // };
+
+
+// // ✅ Get all comments for a video (with sort filter)
+// export const getComments = async (req, res) => {
+//   try {
+//     const videoId = req.params.id;
+//     const { sort } = req.query; // can be 'newest' or 'oldest'
+
+//     // Set sort order based on query
+//     const sortOption = sort === "oldest" ? { createdAt: 1 } : { createdAt: -1 };
+
+//     const comments = await Comment.find({ videoId })
+//       .sort(sortOption)
+//       .populate("userId", "name username avatar"); // optional: populate user info
+
+//     res.status(200).json(comments);
+//   } catch (err) {
+//     console.error("getComments error:", err);
+//     res.status(500).json({ error: "Server error" });
+//   }
+// };
+
+
+
+
+
+
+// // ✅ Delete a comment
+// export const deleteComment = async (req, res) => {
+//   try {
+//     const { commentId } = req.params;
+
+//     const comment = await Comment.findById(commentId);
+//     if (!comment) return res.status(404).json({ error: "Comment not found" });
+
+//     if (comment.userId.toString() !== req.user.id) {
+//       return res.status(403).json({ error: "Not authorized to delete this comment" });
+//     }
+
+//     await Comment.deleteOne({ _id: commentId });
+
+//     const io = req.app.get("io");
+//     if (io) io.to(comment.videoId.toString()).emit("commentDeleted", commentId);
+
+//     res.json({ success: true, commentId });
+//   } catch (err) {
+//     console.error("deleteComment error:", err);
+//     res.status(500).json({ error: "Server error" });
+//   }
+// };
+
+
+
+
+
+
+//  change on 12-11-2025
 import Comment from "../models/Comment.js";
 import Video from "../models/Video.js";
-import User from "../models/User.js"; // ✅ Import User model to fetch fresh data
+import User from "../models/User.js";
 
-// ✅ Add a comment
+// ✅ Add a new comment
 export const addComment = async (req, res) => {
   try {
     const { text } = req.body;
@@ -88,20 +193,17 @@ export const addComment = async (req, res) => {
     const video = await Video.findById(videoId);
     if (!video) return res.status(404).json({ error: "Video not found" });
 
-    // ✅ Fetch the latest user details from DB
     const user = await User.findById(req.user.id).select("name username avatar");
     if (!user) return res.status(404).json({ error: "User not found" });
 
-    // ✅ Create comment with updated name & avatar
     const newComment = await Comment.create({
       videoId,
       userId: user._id,
-      username: user.name || user.username, // use display name if available
+      username: user.name || user.username,
       userAvatar: user.avatar || "",
       text,
     });
 
-    // ✅ Emit real-time update
     const io = req.app.get("io");
     if (io) io.to(videoId).emit("commentAdded", newComment);
 
@@ -112,14 +214,71 @@ export const addComment = async (req, res) => {
   }
 };
 
-// ✅ Get all comments for a video
+// ✅ Get all comments for a video (sorted)
 export const getComments = async (req, res) => {
   try {
     const videoId = req.params.id;
-    const comments = await Comment.find({ videoId }).sort({ createdAt: -1 });
-    res.json(comments);
+    const { sort } = req.query;
+
+    const sortOption = sort === "oldest" ? { createdAt: 1 } : { createdAt: -1 };
+
+    const comments = await Comment.find({ videoId })
+      .sort(sortOption)
+      .populate("userId", "name username avatar");
+
+    res.status(200).json(comments);
   } catch (err) {
     console.error("getComments error:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+};
+
+// ✅ Like a comment
+export const likeComment = async (req, res) => {
+  try {
+    const { commentId } = req.params;
+    const comment = await Comment.findById(commentId);
+
+    if (!comment) return res.status(404).json({ error: "Comment not found" });
+
+    comment.likes = comment.likes + 1;
+    await comment.save();
+
+    const io = req.app.get("io");
+    if (io)
+      io.to(comment.videoId.toString()).emit("commentLiked", {
+        commentId,
+        likes: comment.likes,
+      });
+
+    res.status(200).json({ success: true, likes: comment.likes });
+  } catch (err) {
+    console.error("likeComment error:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+};
+
+// ✅ Dislike a comment
+export const dislikeComment = async (req, res) => {
+  try {
+    const { commentId } = req.params;
+    const comment = await Comment.findById(commentId);
+
+    if (!comment) return res.status(404).json({ error: "Comment not found" });
+
+    comment.dislikes = comment.dislikes + 1;
+    await comment.save();
+
+    const io = req.app.get("io");
+    if (io)
+      io.to(comment.videoId.toString()).emit("commentDisliked", {
+        commentId,
+        dislikes: comment.dislikes,
+      });
+
+    res.status(200).json({ success: true, dislikes: comment.dislikes });
+  } catch (err) {
+    console.error("dislikeComment error:", err);
     res.status(500).json({ error: "Server error" });
   }
 };
@@ -133,7 +292,9 @@ export const deleteComment = async (req, res) => {
     if (!comment) return res.status(404).json({ error: "Comment not found" });
 
     if (comment.userId.toString() !== req.user.id) {
-      return res.status(403).json({ error: "Not authorized to delete this comment" });
+      return res
+        .status(403)
+        .json({ error: "Not authorized to delete this comment" });
     }
 
     await Comment.deleteOne({ _id: commentId });
@@ -147,4 +308,3 @@ export const deleteComment = async (req, res) => {
     res.status(500).json({ error: "Server error" });
   }
 };
-
