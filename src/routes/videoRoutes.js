@@ -407,10 +407,14 @@ router.get("/search/:query", async (req, res) => {
     }
 
     const videos = await Video.find({
-      title: { $regex: query, $options: "i" },
-    })
-      .sort({ createdAt: -1 })
-      .limit(25);
+  $or: [
+    { title: { $regex: query, $options: "i" } },
+    { authorName: { $regex: query, $options: "i" } }
+  ]
+})
+.sort({ createdAt: -1 })
+.limit(25);
+
 
     res.json(videos);
   } catch (err) {
@@ -420,19 +424,26 @@ router.get("/search/:query", async (req, res) => {
 });
 
 // 💡 NEW: Live Suggestions (for Navbar autocomplete)
+// 💡 NEW: Live Suggestions (Search by title + author)
 router.get("/suggest", async (req, res) => {
   try {
     const { q } = req.query; // e.g. ?q=ram
     if (!q || q.trim() === "") {
-      return res.json([]); // empty input = empty suggestions
+      return res.json([]); 
     }
 
+    const normalized = q.toLowerCase().replace(/\s+/g, "");
+
     const suggestions = await Video.find({
-      title: { $regex: q, $options: "i" },
+      $or: [
+        { title: { $regex: q, $options: "i" } },
+        { authorName: { $regex: q, $options: "i" } },
+        { authorName: { $regex: new RegExp(normalized.split("").join(".*"), "i") } }
+      ]
     })
-      .select("title thumbnailUrl") // lightweight response
+      .select("title thumbnailUrl authorName authorAvatar")
       .sort({ createdAt: -1 })
-      .limit(8);
+      .limit(20);
 
     res.json(suggestions);
   } catch (err) {
@@ -440,6 +451,7 @@ router.get("/suggest", async (req, res) => {
     res.status(500).json({ error: "Failed to fetch suggestions" });
   }
 });
+
 
 // ✅ My videos (protected)
 router.get("/my-videos", protect, getMyVideos);
