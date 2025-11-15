@@ -5,7 +5,7 @@
 // const router = express.Router();
 
 // // Add comment to a video
-// router.post("/:id", protect, addComment);
+// router.post("/:id", protect, addComment); 
 
 // // Get all comments for a video
 // router.get("/:id", getComments);
@@ -32,8 +32,8 @@ router.post("/:id", protect, addComment);
 router.get("/:id", getComments);
 router.delete("/:commentId", protect, deleteComment);
 
-router.put("/:commentId/like", protect, likeComment);
+router.put("/:commentId/like", protect, likeComment); 
 router.put("/:commentId/dislike", protect, dislikeComment);
-
+   
 
 export default router;

@@ -9,5 +9,6 @@ router.post("/:id", protect, toggleLike);
 
 // check if current user liked a video
 router.get("/:id", protect, isLiked);
-
-export default router;
+  
+export default router;  
+  

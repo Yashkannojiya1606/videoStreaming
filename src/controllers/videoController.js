@@ -280,19 +280,24 @@ export const getMyVideos = async (req, res) => {
 export const searchVideos = async (req, res) => {
   try {
     const { query } = req.params;
+    if (!query) return res.status(400).json({ error: "Query required" });
 
-    if (!query || query.trim().length === 0) {
-      return res.status(400).json({ error: "Search query is required" });
-    }
+    const normalized = query.toLowerCase().replace(/\s+/g, "");
 
     const videos = await Video.find({
-      title: { $regex: query, $options: "i" }, // ✅ partial + case-insensitive
-    }).sort({ createdAt: -1 });
+      $or: [
+        { title: { $regex: query, $options: "i" } },
+        { authorName: { $regex: query, $options: "i" } },
+        {
+          authorName: {
+            $regex: new RegExp(normalized.split("").join(".*"), "i")
+          }
+        }
+      ]
+    });
 
-    if (!videos.length)
-      return res.status(404).json({ message: "No matching videos found" });
+    res.json(videos);
 
-    res.status(200).json(videos);
   } catch (err) {
     console.error("❌ Search error:", err);
     res.status(500).json({ error: "Failed to search videos" });
@@ -300,23 +305,53 @@ export const searchVideos = async (req, res) => {
 };
 
 
+
+
 // 💡 Suggest videos for live search (autocomplete)
+
+// 💡 Suggest videos for live search (autocomplete) — DEBUG VERSION
 export const suggestVideos = async (req, res) => {
   try {
-    const { q } = req.query; // query param ?q=
-    if (!q || q.trim().length === 0)
-      return res.status(400).json({ error: "Query is required" });
+    const { q } = req.query;
 
-    // Find videos that match partially by title
+    // 🔥 ADD THIS LOG HERE
+    console.log("SUGGEST API HIT:", q);
+
+    if (!q || q.trim().length === 0) {
+      return res.status(400).json({ error: "Query required" });
+    }
+
+    const normalized = q.toLowerCase().replace(/\s+/g, "");
+
     const suggestions = await Video.find({
-      title: { $regex: q, $options: "i" },
+      $or: [
+        { title: { $regex: q, $options: "i" } },
+        { authorName: { $regex: q, $options: "i" } },
+        {
+          authorName: {
+            $regex: new RegExp(normalized.split("").join(".*"), "i")
+          }
+        }
+      ]
     })
-      .select("title thumbnailUrl videoUrl") // optional fields
-      .limit(8);
+      .select("title thumbnailUrl authorName authorAvatar")
+      .limit(20);
 
-    res.status(200).json(suggestions);
+    // 🔥 SECOND DEBUG
+    console.log("SUGGESTIONS FOUND:", suggestions.length);
+
+    return res.json(suggestions);
+
   } catch (err) {
-    console.error("❌ Suggestion error:", err);
-    res.status(500).json({ error: "Failed to fetch suggestions" });
+    console.error("❌ Suggest error:", err);
+    return res.status(500).json({ error: "Failed to fetch suggestions" });
   }
 };
+
+
+
+
+
+
+
+
