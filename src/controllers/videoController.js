@@ -305,10 +305,6 @@ export const searchVideos = async (req, res) => {
 };
 
 
-
-
-// 💡 Suggest videos for live search (autocomplete)
-
 // 💡 Suggest videos for live search (autocomplete) — DEBUG VERSION
 export const suggestVideos = async (req, res) => {
   try {
