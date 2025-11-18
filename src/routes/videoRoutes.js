@@ -273,6 +273,9 @@ import s3 from "../config/aws.js";
 import { toggleLike, isLiked } from "../controllers/likeController.js";
 import { addComment, getComments, deleteComment } from "../controllers/commentController.js";
 import { getMyVideos } from "../controllers/videoController.js";
+import History from "../models/History.js";
+import GuestView from "../models/GuestView.js";
+import jwt from "jsonwebtoken";
 
 const router = express.Router();
 
@@ -473,31 +476,84 @@ router.get("/:id", async (req, res) => {
   }
 });
 
-// 🔼 Increase view count + Realtime broadcast
+
+// 📺 View video
 router.post("/:id/view", async (req, res) => {
   try {
-    const { id } = req.params;
+    const videoId = req.params.id;
 
-    const video = await Video.findByIdAndUpdate(
-      id,
+    // =============== Get User ID (if logged in) ==================
+    let userId = null;
+    if (req.headers.authorization?.startsWith("Bearer")) {
+      try {
+        const token = req.headers.authorization.split(" ")[1];
+        userId = jwt.verify(token, process.env.JWT_SECRET).id;
+      } catch (e) {
+        userId = null; // token invalid or guest user
+      }
+    }
+
+    // =============== Logged-in Users Logic ==================
+    if (userId) {
+      const alreadyViewed = await History.findOne({ userId, videoId });
+
+      if (alreadyViewed) {
+        const video = await Video.findById(videoId);
+        return res.json({ views: video.views });
+      }
+
+      // First time view from this user
+      const video = await Video.findByIdAndUpdate(
+        videoId,
+        { $inc: { views: 1 } },
+        { new: true }
+      );
+
+      await History.create({ userId, videoId });
+
+      req.app.get("io").to(videoId).emit("viewsUpdated", {
+        videoId,
+        views: video.views,
+      });
+
+      return res.json({ views: video.views });
+    }
+
+    // ================= GUEST USERS (IP Based) ===================
+const ip =
+  req.headers["x-forwarded-for"]?.split(",")[0] ||
+  req.ip ||
+  "unknown";
+
+    const alreadyGuestViewed = await GuestView.findOne({ ip, videoId });
+
+    if (alreadyGuestViewed) {
+      const video = await Video.findById(videoId);
+      return res.json({ views: video.views });
+    }
+
+    // First time guest view
+    const updatedVideo = await Video.findByIdAndUpdate(
+      videoId,
       { $inc: { views: 1 } },
       { new: true }
     );
 
-    if (!video) return res.status(404).json({ error: "Video not found" });
+    await GuestView.create({ ip, videoId });
 
-    // 🔥 Broadcast realtime view updates to all viewers
-    req.app.get("io").to(id).emit("viewsUpdated", {
-      videoId: id,
-      views: video.views,
+    req.app.get("io").to(videoId).emit("viewsUpdated", {
+      videoId,
+      views: updatedVideo.views,
     });
 
-    res.json({ views: video.views });
+    res.json({ views: updatedVideo.views });
+
   } catch (err) {
     console.error("View count error:", err);
     res.status(500).json({ error: "Failed to update views" });
   }
 });
+
 
 
 // 🗑️ Delete video by ID (Protected + S3 cleanup)
