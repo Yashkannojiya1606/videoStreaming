@@ -410,13 +410,13 @@ router.get("/search/:query", async (req, res) => {
     }
 
     const videos = await Video.find({
-  $or: [
-    { title: { $regex: query, $options: "i" } },
-    { authorName: { $regex: query, $options: "i" } }
-  ]
-})
-.sort({ createdAt: -1 })
-.limit(25);
+      $or: [
+        { title: { $regex: query, $options: "i" } },
+        { authorName: { $regex: query, $options: "i" } }
+      ]
+    })
+      .sort({ createdAt: -1 })
+      .limit(25);
 
 
     res.json(videos);
@@ -432,7 +432,7 @@ router.get("/suggest", async (req, res) => {
   try {
     const { q } = req.query; // e.g. ?q=ram
     if (!q || q.trim() === "") {
-      return res.json([]); 
+      return res.json([]);
     }
 
     const normalized = q.toLowerCase().replace(/\s+/g, "");
@@ -478,9 +478,12 @@ router.get("/:id", async (req, res) => {
 
 
 // 📺 View video (Atomic + Safe for Logged Users + Guest Users)
+// 📺 View video (Atomic + Debug Enabled)
 router.post("/:id/view", async (req, res) => {
   try {
     const videoId = req.params.id;
+    console.log("\n===============================");
+    console.log("📥 VIEW REQUEST RECEIVED →", videoId);
 
     // ================= Logged-In User Check ==================
     let userId = null;
@@ -488,18 +491,23 @@ router.post("/:id/view", async (req, res) => {
       try {
         const token = req.headers.authorization.split(" ")[1];
         userId = jwt.verify(token, process.env.JWT_SECRET).id;
+        console.log("🔐 Logged-in user →", userId);
       } catch (error) {
+        console.log("⚠️ Invalid token, treating as guest.");
         userId = null;
       }
+    } else {
+      console.log("👤 No token → Guest User");
     }
 
     // ================= Logged-In User Logic ==================
     if (userId) {
-      // already viewed?
       const prev = await History.findOne({ userId, videoId });
 
       if (prev) {
         const video = await Video.findById(videoId);
+        console.log("⛔ Already viewed (logged-in). No increment.");
+        console.log("📊 Current views:", video.views);
         return res.json({ views: video.views });
       }
 
@@ -509,13 +517,15 @@ router.post("/:id/view", async (req, res) => {
         { $setOnInsert: { userId, videoId } },
         { upsert: true }
       );
+      console.log("🟢 First-time view (logged-in). Counting view.");
 
-      // increment view
       const video = await Video.findByIdAndUpdate(
         videoId,
         { $inc: { views: 1 } },
         { new: true }
       );
+
+      console.log("📈 UPDATED VIEWS:", video.views);
 
       req.app.get("io").to(videoId).emit("viewsUpdated", {
         videoId,
@@ -531,6 +541,8 @@ router.post("/:id/view", async (req, res) => {
       req.ip ||
       "unknown";
 
+    console.log("🌍 Guest IP →", ip);
+
     const existingGuest = await GuestView.findOneAndUpdate(
       { ip, videoId },
       { $setOnInsert: { ip, videoId } },
@@ -539,14 +551,20 @@ router.post("/:id/view", async (req, res) => {
 
     if (existingGuest) {
       const video = await Video.findById(videoId);
+      console.log("⛔ Already viewed (guest). No increment.");
+      console.log("📊 Current views:", video.views);
       return res.json({ views: video.views });
     }
+
+    console.log("🟢 First-time guest view. Counting view.");
 
     const updatedVideo = await Video.findByIdAndUpdate(
       videoId,
       { $inc: { views: 1 } },
       { new: true }
     );
+
+    console.log("📈 UPDATED VIEWS:", updatedVideo.views);
 
     req.app.get("io").to(videoId).emit("viewsUpdated", {
       videoId,
@@ -556,11 +574,10 @@ router.post("/:id/view", async (req, res) => {
     return res.json({ views: updatedVideo.views });
 
   } catch (err) {
-    console.error("View count error:", err);
+    console.error("❌ View count error:", err);
     res.status(500).json({ error: "Failed to update views" });
   }
 });
-
 
 
 
