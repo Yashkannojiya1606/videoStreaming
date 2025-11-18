@@ -477,39 +477,45 @@ router.get("/:id", async (req, res) => {
 });
 
 
-// 📺 View video
+// 📺 View video (Atomic + Safe for Logged Users + Guest Users)
 router.post("/:id/view", async (req, res) => {
   try {
     const videoId = req.params.id;
 
-    // =============== Get User ID (if logged in) ==================
+    // ================= Logged-In User Check ==================
     let userId = null;
     if (req.headers.authorization?.startsWith("Bearer")) {
       try {
         const token = req.headers.authorization.split(" ")[1];
         userId = jwt.verify(token, process.env.JWT_SECRET).id;
-      } catch (e) {
-        userId = null; // token invalid or guest user
+      } catch (error) {
+        userId = null;
       }
     }
 
-    // =============== Logged-in Users Logic ==================
+    // ================= Logged-In User Logic ==================
     if (userId) {
-      const alreadyViewed = await History.findOne({ userId, videoId });
+      // already viewed?
+      const prev = await History.findOne({ userId, videoId });
 
-      if (alreadyViewed) {
+      if (prev) {
         const video = await Video.findById(videoId);
         return res.json({ views: video.views });
       }
 
-      // First time view from this user
+      // atomic insert
+      await History.updateOne(
+        { userId, videoId },
+        { $setOnInsert: { userId, videoId } },
+        { upsert: true }
+      );
+
+      // increment view
       const video = await Video.findByIdAndUpdate(
         videoId,
         { $inc: { views: 1 } },
         { new: true }
       );
-
-      await History.create({ userId, videoId });
 
       req.app.get("io").to(videoId).emit("viewsUpdated", {
         videoId,
@@ -519,40 +525,42 @@ router.post("/:id/view", async (req, res) => {
       return res.json({ views: video.views });
     }
 
-    // ================= GUEST USERS (IP Based) ===================
-const ip =
-  req.headers["x-forwarded-for"]?.split(",")[0] ||
-  req.ip ||
-  "unknown";
+    // ================= Guest User Logic ==================
+    const ip =
+      req.headers["x-forwarded-for"]?.split(",")[0] ||
+      req.ip ||
+      "unknown";
 
-    const alreadyGuestViewed = await GuestView.findOne({ ip, videoId });
+    const existingGuest = await GuestView.findOneAndUpdate(
+      { ip, videoId },
+      { $setOnInsert: { ip, videoId } },
+      { upsert: true, new: false }
+    );
 
-    if (alreadyGuestViewed) {
+    if (existingGuest) {
       const video = await Video.findById(videoId);
       return res.json({ views: video.views });
     }
 
-    // First time guest view
     const updatedVideo = await Video.findByIdAndUpdate(
       videoId,
       { $inc: { views: 1 } },
       { new: true }
     );
 
-    await GuestView.create({ ip, videoId });
-
     req.app.get("io").to(videoId).emit("viewsUpdated", {
       videoId,
       views: updatedVideo.views,
     });
 
-    res.json({ views: updatedVideo.views });
+    return res.json({ views: updatedVideo.views });
 
   } catch (err) {
     console.error("View count error:", err);
     res.status(500).json({ error: "Failed to update views" });
   }
 });
+
 
 
 
