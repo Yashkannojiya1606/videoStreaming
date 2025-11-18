@@ -423,7 +423,7 @@ router.get("/search/:query", async (req, res) => {
   }
 });
 
-// 💡 NEW: Live Suggestions (for Navbar autocomplete)
+
 // 💡 NEW: Live Suggestions (Search by title + author)
 router.get("/suggest", async (req, res) => {
   try {
@@ -472,6 +472,33 @@ router.get("/:id", async (req, res) => {
     res.status(500).json({ error: "Failed to fetch video" });
   }
 });
+
+// 🔼 Increase view count + Realtime broadcast
+router.post("/:id/view", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const video = await Video.findByIdAndUpdate(
+      id,
+      { $inc: { views: 1 } },
+      { new: true }
+    );
+
+    if (!video) return res.status(404).json({ error: "Video not found" });
+
+    // 🔥 Broadcast realtime view updates to all viewers
+    req.app.get("io").to(id).emit("viewsUpdated", {
+      videoId: id,
+      views: video.views,
+    });
+
+    res.json({ views: video.views });
+  } catch (err) {
+    console.error("View count error:", err);
+    res.status(500).json({ error: "Failed to update views" });
+  }
+});
+
 
 // 🗑️ Delete video by ID (Protected + S3 cleanup)
 router.delete("/:id", protect, async (req, res) => {
