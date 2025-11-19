@@ -169,26 +169,30 @@ app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
 // ✅ Allowed origins (include both www & non-www)
 const allowedOrigins = [
- "http://localhost:5173",
+  "http://localhost:5173",
   "https://bharatvids.com",
   "https://www.bharatvids.com",
-  // "https://videostream.overair.in",
-  // "https://www.videostream.overair.in",
   "https://videostreaming-rns0.onrender.com",
-]; 
+];
+
+const normalize = (origin) => origin?.replace(/\/$/, "");
 
 app.use(
   cors({
-    origin: function (origin, callback) {
-      if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, true);
-      } else {
-        console.warn("❌ Blocked by CORS:", origin);
-        callback(new Error("Not allowed by CORS"));
+    origin: (origin, callback) => {
+      const cleanOrigin = normalize(origin);
+
+      console.log("🔍 Incoming Origin:", cleanOrigin);
+
+      if (!cleanOrigin || allowedOrigins.includes(cleanOrigin)) {
+        return callback(null, true);
       }
+
+      console.warn("❌ Blocked by CORS:", cleanOrigin);
+      return callback(new Error("Not allowed by CORS: " + cleanOrigin));
     },
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   })
 );
 
@@ -230,9 +234,18 @@ app.use((err, req, res, next) => {
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: {
-    origin: allowedOrigins,
-    methods: ["GET", "POST"],
+    origin: (origin, callback) => {
+      const cleanOrigin = normalize(origin);
+
+      if (!cleanOrigin || allowedOrigins.includes(cleanOrigin)) {
+        return callback(null, true);
+      }
+
+      console.warn("❌ Socket.IO CORS Blocked:", cleanOrigin);
+      callback(new Error("Socket.IO CORS error: " + cleanOrigin));
+    },
     credentials: true,
+    methods: ["GET", "POST"],
   },
 });
 
