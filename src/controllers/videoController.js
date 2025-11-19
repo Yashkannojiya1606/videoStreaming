@@ -252,12 +252,43 @@ export const cleanupOldVideos = async (req, res) => {
 
 
 // 👤 Get videos uploaded by the logged-in user
+// export const getMyVideos = async (req, res) => {
+//   try {
+//     if (!req.user || !req.user.id)
+//       return res.status(401).json({ error: "Unauthorized - user not found" });
+
+//     const myVideos = await Video.find({ userId: req.user.id }).sort({ createdAt: -1 });
+
+//     return res.status(200).json({
+//       success: true,
+//       count: myVideos.length,
+//       videos: myVideos,
+//     });
+//   } catch (err) {
+//     console.error("❌ Error fetching user's videos:", err);
+//     return res.status(500).json({ error: "Failed to fetch your videos" });
+//   }
+// };
+
+
+
+
+//  today updated code 19-11-2025
 export const getMyVideos = async (req, res) => {
   try {
     if (!req.user || !req.user.id)
       return res.status(401).json({ error: "Unauthorized - user not found" });
 
-    const myVideos = await Video.find({ userId: req.user.id }).sort({ createdAt: -1 });
+    let myVideos = await Video.find({ userId: req.user.id })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    // ⭐ Fix undefined fields for old videos
+    myVideos = myVideos.map(v => ({
+      ...v,
+      likeCount: v.likeCount ?? 0,
+      commentCount: v.commentCount ?? 0,
+    }));
 
     return res.status(200).json({
       success: true,
@@ -269,6 +300,7 @@ export const getMyVideos = async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch your videos" });
   }
 };
+
 
 
 

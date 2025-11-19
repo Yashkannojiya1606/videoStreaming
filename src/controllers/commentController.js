@@ -203,6 +203,11 @@ export const addComment = async (req, res) => {
       userAvatar: user.avatar || "",
       text,
     });
+    // ⭐ Increase comment count on video
+await Video.findByIdAndUpdate(videoId, {
+  $inc: { commentCount: 1 }
+});
+
 
     const io = req.app.get("io");
     if (io) io.to(videoId).emit("commentAdded", newComment);
@@ -294,10 +299,14 @@ export const deleteComment = async (req, res) => {
     if (comment.userId.toString() !== req.user.id) {
       return res
         .status(403)
-        .json({ error: "Not authorized to delete this comment" });
+        .json({ error: "Not authorized to delete this comment" });  
     }
 
     await Comment.deleteOne({ _id: commentId });
+    await Video.findByIdAndUpdate(comment.videoId, {
+  $inc: { commentCount: -1 },
+  $max: { commentCount: 0 }
+});
 
     const io = req.app.get("io");
     if (io) io.to(comment.videoId.toString()).emit("commentDeleted", commentId);
