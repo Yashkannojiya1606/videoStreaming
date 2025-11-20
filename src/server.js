@@ -158,7 +158,7 @@ import likeRoutes from "./routes/likeRoutes.js";
 import commentRoutes from "./routes/commentRoutes.js";
 import subscriptionRoutes from "./routes/subscriptionRoutes.js"; // ✅ NEW
 import historyRoutes from "./routes/historyRoutes.js";
-import watchlaterRoutes from "./routes/tempRoutes.js";
+import watchlaterRoutes from "./routes/watchlaterRoutes.js";
 
 dotenv.config();
 const app = express();
