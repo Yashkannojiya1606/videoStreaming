@@ -45,12 +45,69 @@
 // };
 
 
+// import jwt from "jsonwebtoken";
+// import User from "../models/User.js";
+
+// export const protect = async (req, res, next) => {
+//   try {
+//     // 1️⃣ Extract token from header or cookie
+//     let token = null;
+
+//     if (req.headers.authorization?.startsWith("Bearer ")) {
+//       token = req.headers.authorization.split(" ")[1];
+//     } else if (req.cookies?.token) {
+//       token = req.cookies.token;
+//     }
+
+//     if (!token) {
+//       return res.status(401).json({
+//         success: false,
+//         message: "Unauthorized - No token provided",
+//       });
+//     }
+
+//     // 2️⃣ Verify JWT
+//     const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+//     // 3️⃣ Fetch full user only if needed
+//     let user = decoded;
+//     if (!decoded.username) {
+//       user = await User.findById(decoded.id).select("username email avatar");
+//       if (!user) {
+//         return res.status(401).json({
+//           success: false,
+//           message: "User not found",
+//         });
+//       }
+//     }
+
+//     // 4️⃣ Attach user to request
+//     req.user = user;
+
+//     // 5️⃣ Continue to next middleware
+//     next();
+//   } catch (err) {
+//     console.error("🔒 Auth error:", err.message);
+
+//     return res.status(401).json({
+//       success: false,
+//       message: "Invalid or expired token",
+//       error: err.message,
+//     });
+//   }
+// };
+
+
+
+
+
+// today updated code 20-11-2025
+
 import jwt from "jsonwebtoken";
 import User from "../models/User.js";
 
 export const protect = async (req, res, next) => {
   try {
-    // 1️⃣ Extract token from header or cookie
     let token = null;
 
     if (req.headers.authorization?.startsWith("Bearer ")) {
@@ -66,11 +123,11 @@ export const protect = async (req, res, next) => {
       });
     }
 
-    // 2️⃣ Verify JWT
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    // 3️⃣ Fetch full user only if needed
     let user = decoded;
+
+    // If decoded does not contain username, fetch user from DB
     if (!decoded.username) {
       user = await User.findById(decoded.id).select("username email avatar");
       if (!user) {
@@ -81,10 +138,10 @@ export const protect = async (req, res, next) => {
       }
     }
 
-    // 4️⃣ Attach user to request
-    req.user = user;
+    // 🔥 FIX: ALWAYS give routes a consistent user.id
+    user.id = user.id || user._id;
 
-    // 5️⃣ Continue to next middleware
+    req.user = user;
     next();
   } catch (err) {
     console.error("🔒 Auth error:", err.message);
@@ -92,7 +149,8 @@ export const protect = async (req, res, next) => {
     return res.status(401).json({
       success: false,
       message: "Invalid or expired token",
-      error: err.message,
     });
   }
 };
+
+
