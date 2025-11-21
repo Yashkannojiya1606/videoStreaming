@@ -159,6 +159,8 @@ import commentRoutes from "./routes/commentRoutes.js";
 import subscriptionRoutes from "./routes/subscriptionRoutes.js"; // ✅ NEW
 import historyRoutes from "./routes/historyRoutes.js";
 import watchlaterRoutes from "./routes/watchlaterRoutes.js";
+import playlistRoutes from "./routes/playlistRoutes.js";
+
 
 dotenv.config();
 const app = express();
@@ -211,6 +213,7 @@ app.use("/api/comments", commentRoutes);
 app.use("/api/subscriptions", subscriptionRoutes); // ✅ MOUNTED HERE
 app.use("/api/history", historyRoutes);
 app.use("/api/watchlater", watchlaterRoutes);
+app.use("/api/playlists", playlistRoutes);
 
 // ✅ Health check
 app.get("/", (req, res) => res.send("API is running..."));
