@@ -69,10 +69,90 @@
 
 
 
+// import Like from "../models/Like.js";
+// import Video from "../models/Video.js";
+
+// // ✅ Toggle like/unlike
+// export const toggleLike = async (req, res) => {
+//   try {
+//     const userId = req.user.id;
+//     const videoId = req.params.id;
+//     const io = req.app.get("io");
+
+//     const video = await Video.findById(videoId);
+//     if (!video) return res.status(404).json({ error: "Video not found" });
+
+//     const existing = await Like.findOne({ userId, videoId });
+
+//     if (existing) {
+//       // Unlike
+//       await Like.deleteOne({ _id: existing._id });
+
+//       const updated = await Video.findByIdAndUpdate(
+//         videoId,
+//         { $inc: { likeCount: -1 } },
+//         { new: true }
+//       );
+
+//       if (io) io.to(videoId).emit("likeUpdated", { videoId, likeCount: updated.likeCount });
+
+//       return res.json({ liked: false, likeCount: updated.likeCount });
+//     } else {
+//       // Like
+//       try {
+//         await Like.create({ userId, videoId });
+//       } catch (err) {
+//         if (err.code !== 11000) throw err;
+//       }
+
+//       const updated = await Video.findByIdAndUpdate(
+//         videoId,
+//         { $inc: { likeCount: 1 } },
+//         { new: true }
+//       );
+
+//       if (io) io.to(videoId).emit("likeUpdated", { videoId, likeCount: updated.likeCount });
+
+//       return res.json({ liked: true, likeCount: updated.likeCount });
+//     }
+//   } catch (err) {
+//     console.error("toggleLike error:", err);
+//     res.status(500).json({ error: "Server error" });
+//   }
+// };
+
+// // ✅ Check if current user liked the video
+// export const isLiked = async (req, res) => {
+//   try {
+//     const userId = req.user.id;
+//     const videoId = req.params.id;
+
+//     const existing = await Like.findOne({ userId, videoId });
+//     res.json({ liked: !!existing });
+//   } catch (err) {
+//     console.error("isLiked error:", err);
+//     res.status(500).json({ error: "Server error" });
+//   }
+// };
+
+// // ✅ Get all liked videos by current user
+// export const getLikedVideos = async (req, res) => {
+//   try {
+//     const userId = req.user.id;
+
+//     const likes = await Like.find({ userId }).populate("videoId");
+
+//     res.json(likes);
+//   } catch (err) {
+//     console.error("getLikedVideos error:", err);
+//     res.status(500).json({ error: "Server error" });
+//   }
+// };
+
+
 import Like from "../models/Like.js";
 import Video from "../models/Video.js";
 
-// ✅ Toggle like/unlike
 export const toggleLike = async (req, res) => {
   try {
     const userId = req.user.id;
@@ -85,7 +165,6 @@ export const toggleLike = async (req, res) => {
     const existing = await Like.findOne({ userId, videoId });
 
     if (existing) {
-      // Unlike
       await Like.deleteOne({ _id: existing._id });
 
       const updated = await Video.findByIdAndUpdate(
@@ -98,7 +177,6 @@ export const toggleLike = async (req, res) => {
 
       return res.json({ liked: false, likeCount: updated.likeCount });
     } else {
-      // Like
       try {
         await Like.create({ userId, videoId });
       } catch (err) {
@@ -121,7 +199,6 @@ export const toggleLike = async (req, res) => {
   }
 };
 
-// ✅ Check if current user liked the video
 export const isLiked = async (req, res) => {
   try {
     const userId = req.user.id;
@@ -135,12 +212,17 @@ export const isLiked = async (req, res) => {
   }
 };
 
-// ✅ Get all liked videos by current user
+// ⭐ FIXED getLikedVideos
 export const getLikedVideos = async (req, res) => {
   try {
     const userId = req.user.id;
 
-    const likes = await Like.find({ userId }).populate("videoId");
+    let likes = await Like.find({ userId })
+      .populate("videoId")
+      .sort({ createdAt: -1 });
+
+    // remove broken likes
+    likes = likes.filter(item => item.videoId !== null);
 
     res.json(likes);
   } catch (err) {
