@@ -65,8 +65,10 @@
 
 
 
+// today 25-11
 import Subscription from "../models/Subscription.js";
 import User from "../models/User.js";
+import Video from "../models/Video.js";
 
 /**
  * Toggle subscribe/unsubscribe
@@ -106,7 +108,7 @@ export const toggleSubscription = async (req, res) => {
 };
 
 /**
- * Check if user is subscribed to channel
+ * Check if user is subscribed to a channel
  */
 export const checkSubscribed = async (req, res) => {
   try {
@@ -137,14 +139,14 @@ export const getSubscriberCount = async (req, res) => {
 };
 
 /**
- * Get all subscribed channels + channel info + videos
+ * Get only subscribed channels (list page)
  */
 export const getMySubscriptions = async (req, res) => {
   try {
     const subscriberId = req.user.id;
 
     const subs = await Subscription.find({ subscriberId })
-      .populate("channelId", "username avatar description")
+      .populate("channelId", "username avatar description isVerified")
       .lean();
 
     res.json(subs);
@@ -153,3 +155,33 @@ export const getMySubscriptions = async (req, res) => {
     res.status(500).json({ error: "Server error" });
   }
 };
+
+/**
+ * Get feed: all videos from subscribed channels
+ */
+export const getSubscribedVideos = async (req, res) => {
+  try {
+    const subscriberId = req.user.id;
+
+    // 1. find subscribed channels
+    const subs = await Subscription.find({ subscriberId });
+
+    const channelIds = subs.map((s) => s.channelId);
+
+    if (channelIds.length === 0) {
+      return res.json([]);
+    }
+
+    // 2. fetch ALL recent videos from these channels
+    const videos = await Video.find({ userId: { $in: channelIds } })
+      .sort({ createdAt: -1 })
+      .populate("userId", "username avatar isVerified")
+      .lean();
+
+    res.json(videos);
+  } catch (err) {
+    console.error("getSubscribedVideos error:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+};
+

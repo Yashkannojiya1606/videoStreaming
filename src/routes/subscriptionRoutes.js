@@ -23,12 +23,16 @@ import {
   getSubscriberCount,
   checkSubscribed,
   getMySubscriptions,
+  getSubscribedVideos,
 } from "../controllers/subscriptionController.js";
 
 const router = express.Router();
 
-// ⭐ Fetch subscribed videos
-router.get("/me", protect, getMySubscriptions);
+// ⭐ Feed: videos from subscribed channels
+router.get("/me", protect, getSubscribedVideos);
+
+// ⭐ Channel list (optional)
+router.get("/channels", protect, getMySubscriptions);
 
 // ⭐ Subscribe / Unsubscribe
 router.post("/:channelId", protect, toggleSubscription);
