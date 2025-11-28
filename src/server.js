@@ -161,6 +161,8 @@ import historyRoutes from "./routes/historyRoutes.js";
 import watchlaterRoutes from "./routes/watchlaterRoutes.js";
 import playlistRoutes from "./routes/playlistRoutes.js";
 import trendingRoutes from "./routes/trendingRoutes.js";
+import productRoutes from "./routes/productRoutes.js";
+
 
 
 dotenv.config();
@@ -216,6 +218,9 @@ app.use("/api/history", historyRoutes);
 app.use("/api/watchlater", watchlaterRoutes);
 app.use("/api/playlists", playlistRoutes);
 app.use("/api/trending", trendingRoutes);
+app.use("/api/products", productRoutes);
+
+
 
 // ✅ Health check
 app.get("/", (req, res) => res.send("API is running..."));
