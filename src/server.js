@@ -160,6 +160,7 @@ import subscriptionRoutes from "./routes/subscriptionRoutes.js"; // ✅ NEW
 import historyRoutes from "./routes/historyRoutes.js";
 import watchlaterRoutes from "./routes/watchlaterRoutes.js";
 import playlistRoutes from "./routes/playlistRoutes.js";
+import trendingRoutes from "./routes/trendingRoutes.js";
 
 
 dotenv.config();
@@ -214,6 +215,7 @@ app.use("/api/subscriptions", subscriptionRoutes); // ✅ MOUNTED HERE
 app.use("/api/history", historyRoutes);
 app.use("/api/watchlater", watchlaterRoutes);
 app.use("/api/playlists", playlistRoutes);
+app.use("/api/trending", trendingRoutes);
 
 // ✅ Health check
 app.get("/", (req, res) => res.send("API is running..."));
