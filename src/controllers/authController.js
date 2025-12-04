@@ -375,85 +375,165 @@
 
 
 
+// import bcrypt from "bcryptjs";
+// import jwt from "jsonwebtoken";
+// import User from "../models/User.js";
+
+// // ---------------- LOCAL REGISTER -----------------
+// export const registerUser = async (req, res) => {
+//   try {
+//     const { name, email, password, dob } = req.body;
+
+//     if (!name || !email || !password || !dob) {
+//       return res.status(400).json({ message: "name, email, password and dob are required" });
+//     }
+
+//     const existingUser = await User.findOne({ email });    
+//     if (existingUser)           
+//       return res.status(400).json({ message: "User already exists" });
+
+//     const hashedPassword = await bcrypt.hash(password, 10);
+//     // const username = email.split("@")[0];
+//     let baseUsername = email.split("@")[0];
+// let username = baseUsername;
+// let counter = 1;
+
+// // ensure unique username
+// while (await User.findOne({ username })) {
+//   username = `${baseUsername}${counter}`;
+//   counter++;
+// }
+
+
+//     const newUser = await User.create({
+//       name,
+//       email,
+//       password: hashedPassword,
+//       username,
+//       dob,
+//       authProvider: "local",
+//     });
+
+//     const token = jwt.sign(
+//       { id: newUser._id },
+//       process.env.JWT_SECRET || "dev_secret",
+//       { expiresIn: "7d" }
+//     );
+
+//     res.status(201).json({
+//       user: {
+//         _id: newUser._id,
+//         name: newUser.name,
+//         email: newUser.email,
+//         dob: newUser.dob,
+//         avatar: newUser.avatar,
+//         username: newUser.username,
+//       },
+//       token,
+//     });
+//   } catch (err) {
+//     console.error("registerUser error:", err);
+//     res.status(500).json({ error: err.message });
+//   }
+// };
+
+// // ---------------- LOCAL LOGIN ------------------    
+// export const loginUser = async (req, res) => {
+//   try {
+//     const { email, password } = req.body;
+
+//     const user = await User.findOne({ email });
+//     if (!user) return res.status(400).json({ message: "Invalid credentials" });
+
+//     if (user.authProvider === "google") {
+//       return res.status(400).json({
+//         message: "This account is registered with Google. Please use Google login.",
+//       });
+//     }
+
+//     const isPasswordCorrect = await bcrypt.compare(password, user.password);
+//     if (!isPasswordCorrect)
+//       return res.status(400).json({ message: "Invalid credentials" });
+
+//     const token = jwt.sign(
+//       { id: user._id },
+//       process.env.JWT_SECRET || "dev_secret",
+//       { expiresIn: "7d" }
+//     );
+
+//     res.json({
+//       token,
+//       user: {
+//         _id: user._id,
+//         name: user.name,
+//         email: user.email,
+//         dob: user.dob,
+//         avatar: user.avatar,
+//         username: user.username,
+//       },
+//     });
+//   } catch (err) {
+//     res.status(500).json({ error: err.message });
+//   }
+// };
+
+// // ---------------- GOOGLE LOGIN -----------------
+// export const googleLogin = async (req, res) => {
+//   try {
+//     // Here you would handle the OAuth response (e.g., from Google API)
+//     // and verify the Google ID token, then find or create a user.
+//     // For now, let's just send a placeholder response.
+//     res.json({ message: "Google login route works!" });
+//   } catch (err) {
+//     console.error("googleLogin error:", err);
+//     res.status(500).json({ error: err.message });
+//   }
+// };
+
+
+
+// today code 04122025
+
+
+import { OAuth2Client } from "google-auth-library";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import User from "../models/User.js";
 
-// ---------------- LOCAL REGISTER -----------------
-export const registerUser = async (req, res) => {
+const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+
+// ---------------- GOOGLE LOGIN -----------------
+export const googleLogin = async (req, res) => {
   try {
-    const { name, email, password, dob } = req.body;
+    const { id_token } = req.body;
+    if (!id_token) return res.status(400).json({ message: "Missing Google ID Token" });
 
-    if (!name || !email || !password || !dob) {
-      return res.status(400).json({ message: "name, email, password and dob are required" });
-    }
-
-    const existingUser = await User.findOne({ email });    
-    if (existingUser)           
-      return res.status(400).json({ message: "User already exists" });
-
-    const hashedPassword = await bcrypt.hash(password, 10);
-    // const username = email.split("@")[0];
-    let baseUsername = email.split("@")[0];
-let username = baseUsername;
-let counter = 1;
-
-// ensure unique username
-while (await User.findOne({ username })) {
-  username = `${baseUsername}${counter}`;
-  counter++;
-}
-
-
-    const newUser = await User.create({
-      name,
-      email,
-      password: hashedPassword,
-      username,
-      dob,
-      authProvider: "local",
+    // Verify Google Token
+    const ticket = await client.verifyIdToken({
+      idToken: id_token,
+      audience: process.env.GOOGLE_CLIENT_ID,
     });
 
-    const token = jwt.sign(
-      { id: newUser._id },
-      process.env.JWT_SECRET || "dev_secret",
-      { expiresIn: "7d" }
-    );
+    const payload = ticket.getPayload();
+    const { email, name, picture, sub } = payload;
 
-    res.status(201).json({
-      user: {
-        _id: newUser._id,
-        name: newUser.name,
-        email: newUser.email,
-        dob: newUser.dob,
-        avatar: newUser.avatar,
-        username: newUser.username,
-      },
-      token,
-    });
-  } catch (err) {
-    console.error("registerUser error:", err);
-    res.status(500).json({ error: err.message });
-  }
-};
+    if (!email)
+      return res.status(400).json({ message: "Google account email is required" });
 
-// ---------------- LOCAL LOGIN ------------------    
-export const loginUser = async (req, res) => {
-  try {
-    const { email, password } = req.body;
+    // Find user or create
+    let user = await User.findOne({ email });
 
-    const user = await User.findOne({ email });
-    if (!user) return res.status(400).json({ message: "Invalid credentials" });
-
-    if (user.authProvider === "google") {
-      return res.status(400).json({
-        message: "This account is registered with Google. Please use Google login.",
+    if (!user) {
+      user = await User.create({
+        name,
+        email,
+        password: null,
+        username: email.split("@")[0],
+        avatar: picture,
+        authProvider: "google",
+        googleId: sub,
       });
     }
-
-    const isPasswordCorrect = await bcrypt.compare(password, user.password);
-    if (!isPasswordCorrect)
-      return res.status(400).json({ message: "Invalid credentials" });
 
     const token = jwt.sign(
       { id: user._id },
@@ -467,26 +547,14 @@ export const loginUser = async (req, res) => {
         _id: user._id,
         name: user.name,
         email: user.email,
-        dob: user.dob,
         avatar: user.avatar,
         username: user.username,
       },
     });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+  } catch (error) {
+    console.error("googleLogin error:", error);
+    res.status(500).json({ error: error.message });
   }
 };
 
-// ---------------- GOOGLE LOGIN -----------------
-export const googleLogin = async (req, res) => {
-  try {
-    // Here you would handle the OAuth response (e.g., from Google API)
-    // and verify the Google ID token, then find or create a user.
-    // For now, let's just send a placeholder response.
-    res.json({ message: "Google login route works!" });
-  } catch (err) {
-    console.error("googleLogin error:", err);
-    res.status(500).json({ error: err.message });
-  }
-};
          
