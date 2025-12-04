@@ -495,20 +495,125 @@
 // today code 04122025
 
 
-import { OAuth2Client } from "google-auth-library";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import User from "../models/User.js";
+import { OAuth2Client } from "google-auth-library";
 
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
-// ---------------- GOOGLE LOGIN -----------------
+/* ---------------------------------------------
+   LOCAL REGISTER
+---------------------------------------------- */
+export const registerUser = async (req, res) => {
+  try {
+    const { name, email, password, dob } = req.body;
+
+    if (!name || !email || !password || !dob) {
+      return res.status(400).json({ message: "name, email, password and dob are required" });
+    }
+
+    const existingUser = await User.findOne({ email });
+    if (existingUser)
+      return res.status(400).json({ message: "User already exists" });
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    let baseUsername = email.split("@")[0];
+    let username = baseUsername;
+    let counter = 1;
+
+    while (await User.findOne({ username })) {
+      username = `${baseUsername}${counter}`;
+      counter++;
+    }
+
+    const newUser = await User.create({
+      name,
+      email,
+      password: hashedPassword,
+      username,
+      dob,
+      authProvider: "local",
+    });
+
+    const token = jwt.sign(
+      { id: newUser._id },
+      process.env.JWT_SECRET || "dev_secret",
+      { expiresIn: "7d" }
+    );
+
+    res.status(201).json({
+      user: {
+        _id: newUser._id,
+        name: newUser.name,
+        email: newUser.email,
+        dob: newUser.dob,
+        avatar: newUser.avatar,
+        username: newUser.username,
+      },
+      token,
+    });
+  } catch (err) {
+    console.error("registerUser error:", err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+/* ---------------------------------------------
+   LOCAL LOGIN
+---------------------------------------------- */
+export const loginUser = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    const user = await User.findOne({ email });
+    if (!user)
+      return res.status(400).json({ message: "Invalid credentials" });
+
+    if (user.authProvider === "google") {
+      return res.status(400).json({
+        message: "This account is registered with Google. Please use Google login.",
+      });
+    }
+
+    const isPasswordCorrect = await bcrypt.compare(password, user.password);
+    if (!isPasswordCorrect)
+      return res.status(400).json({ message: "Invalid credentials" });
+
+    const token = jwt.sign(
+      { id: user._id },
+      process.env.JWT_SECRET || "dev_secret",
+      { expiresIn: "7d" }
+    );
+
+    res.json({
+      token,
+      user: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        dob: user.dob,
+        avatar: user.avatar,
+        username: user.username,
+      },
+    });
+  } catch (err) {
+    console.error("loginUser error:", err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+/* ---------------------------------------------
+   GOOGLE LOGIN
+---------------------------------------------- */
 export const googleLogin = async (req, res) => {
   try {
     const { id_token } = req.body;
-    if (!id_token) return res.status(400).json({ message: "Missing Google ID Token" });
+    if (!id_token)
+      return res.status(400).json({ message: "Missing Google ID Token" });
 
-    // Verify Google Token
+    // Verify token
     const ticket = await client.verifyIdToken({
       idToken: id_token,
       audience: process.env.GOOGLE_CLIENT_ID,
@@ -518,11 +623,11 @@ export const googleLogin = async (req, res) => {
     const { email, name, picture, sub } = payload;
 
     if (!email)
-      return res.status(400).json({ message: "Google account email is required" });
+      return res.status(400).json({ message: "Email required" });
 
-    // Find user or create
     let user = await User.findOne({ email });
 
+    // Create if new
     if (!user) {
       user = await User.create({
         name,
@@ -535,6 +640,7 @@ export const googleLogin = async (req, res) => {
       });
     }
 
+    // Create JWT
     const token = jwt.sign(
       { id: user._id },
       process.env.JWT_SECRET || "dev_secret",
