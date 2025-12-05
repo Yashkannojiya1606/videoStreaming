@@ -56,56 +56,44 @@ import {
 
 const router = express.Router();
 
-// ---------------- LOCAL AUTH ----------------
-router.post("/register", registerUser);
-router.post("/login", loginUser);
-
-// ---------------- GOOGLE AUTH START ----------------
-
-// 🔥 AUTO-DETECT FRONTEND URL (LOCAL OR LIVE)
+/* --------------------------------------------------------
+   DETECT FRONTEND (LOCAL OR LIVE)
+--------------------------------------------------------- */
 function getClientURL(req) {
-  const origin = req.headers.origin;
+  const origin = req.headers.origin || "";
 
-  // If request is from localhost → return local FRONTEND
-  if (origin && origin.includes("localhost")) {
+  if (origin.includes("localhost")) {
     return "http://localhost:5173";
   }
 
-  // Otherwise → return LIVE URL
   return process.env.CLIENT_URL || "https://bharatvids.com";
 }
 
-// 🔥 Redirect user to Google Login Page
+/* --------------------------------------------------------
+   STEP 1 — Redirect user to Google login page
+--------------------------------------------------------- */
 router.get("/google", (req, res) => {
-  const CLIENT_REDIRECT = getClientURL(req);
-
-  console.log("🔥 GOOGLE LOGIN STARTED → redirecting to Google...");
-  console.log("Using Redirect URI:", process.env.GOOGLE_REDIRECT_URI);
-
-  const redirectUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${
+  const redirectURL = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${
     process.env.GOOGLE_CLIENT_ID
   }&redirect_uri=${
     process.env.GOOGLE_REDIRECT_URI
-  }&response_type=code&scope=profile%20email&access_type=offline`;
+  }&response_type=code&scope=profile%20email`;
 
-  res.redirect(redirectUrl);
+  res.redirect(redirectURL);
 });
 
-// 🔥 Google redirects back with code
+/* --------------------------------------------------------
+   STEP 2 — Google redirects BACK with "code"
+--------------------------------------------------------- */
 router.get("/google/callback", async (req, res) => {
-  const CLIENT_REDIRECT = getClientURL(req);
+  const CLIENT_URL = getClientURL(req);
 
   try {
     const { code } = req.query;
 
-    if (!code) {
-      console.log("❌ NO AUTH CODE FROM GOOGLE");
-      return res.redirect(`${CLIENT_REDIRECT}?googleAuth=error`);
-    }
+    if (!code) return res.redirect(`${CLIENT_URL}?googleAuth=error`);
 
-    console.log("🔥 GOOGLE AUTH CODE RECEIVED:", code);
-
-    // Exchange code → Google ID Token
+    // Convert Google code → ID TOKEN
     const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -119,46 +107,33 @@ router.get("/google/callback", async (req, res) => {
     });
 
     const tokenData = await tokenRes.json();
-    console.log("🔥 TOKEN EXCHANGE RESULT:", tokenData);
+    if (!tokenData.id_token) return res.redirect(`${CLIENT_URL}?googleAuth=error`);
 
-    if (!tokenData.id_token) {
-      console.log("❌ NO ID TOKEN RECEIVED FROM GOOGLE");
-      return res.redirect(`${CLIENT_REDIRECT}?googleAuth=error`);
-    }
-
-    // Send ID token to backend to process user and generate JWT
-    const appLoginRes = await fetch(`${process.env.API_URL}/auth/google`, {
+    // Send ID token to backend to validate & create JWT
+    const appRes = await fetch(`${process.env.API_URL}/auth/google`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id_token: tokenData.id_token }),
     });
 
-    const appLoginData = await appLoginRes.json();
-    console.log("🔥 APP LOGIN DATA:", appLoginData);
+    const appData = await appRes.json();
+    if (!appData.token) return res.redirect(`${CLIENT_URL}?googleAuth=error`);
 
-    if (!appLoginData.token) {
-      console.log("❌ BACKEND DID NOT RETURN TOKEN");
-      return res.redirect(`${CLIENT_REDIRECT}?googleAuth=error`);
-    }
-
-    // Redirect user to frontend with JWT token and user object
-    const redirectURL = `${CLIENT_REDIRECT}/?token=${appLoginData.token}&user=${encodeURIComponent(
-      JSON.stringify(appLoginData.user)
-    )}`;
-
-    console.log("🔥 FINAL REDIRECT TO:", redirectURL);
-
-    res.redirect(redirectURL);
-
-  } catch (error) {
-    console.error("❌ GOOGLE OAUTH ERROR:", error);
-    res.redirect(`${CLIENT_REDIRECT}?googleAuth=error`);
+    // FRONTEND WILL CATCH THESE IN URL
+    return res.redirect(
+      `${CLIENT_URL}/?token=${appData.token}&user=${encodeURIComponent(
+        JSON.stringify(appData.user)
+      )}`
+    );
+  } catch (err) {
+    console.error("GOOGLE AUTH ERROR:", err);
+    return res.redirect(`${CLIENT_URL}?googleAuth=error`);
   }
 });
 
-// Step 3: Backend handles Google ID token
+/* --------------------------------------------------------
+   STEP 3 — Backend verifies Google ID token
+--------------------------------------------------------- */
 router.post("/google", googleLogin);
-
-// ---------------- GOOGLE AUTH END ----------------
 
 export default router;
