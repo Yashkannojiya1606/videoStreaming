@@ -143,9 +143,11 @@
 
 // new code as per today for subscription socket io update
 
+import dotenv from "dotenv";
+dotenv.config();
 
 import express from "express";
-import dotenv from "dotenv";
+// import dotenv from "dotenv";
 import cors from "cors";
 import path from "path";
 import { createServer } from "http";
@@ -167,7 +169,7 @@ import productRoutes from "./routes/productRoutes.js";
 
 
 
-dotenv.config();
+// dotenv.config();
 const app = express();
 
 // ✅ Parse JSON and form data

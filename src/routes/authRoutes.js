@@ -57,7 +57,7 @@ import {
 const router = express.Router();
 
 /* --------------------------------------------------------
-   DETECT FRONTEND (LOCAL OR LIVE)
+   Detect Client URL
 --------------------------------------------------------- */
 function getClientURL(req) {
   const origin = req.headers.origin || "";
@@ -90,10 +90,9 @@ router.get("/google/callback", async (req, res) => {
 
   try {
     const { code } = req.query;
-
     if (!code) return res.redirect(`${CLIENT_URL}?googleAuth=error`);
 
-    // Convert Google code → ID TOKEN
+    // Exchange code → id_token
     const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -107,19 +106,23 @@ router.get("/google/callback", async (req, res) => {
     });
 
     const tokenData = await tokenRes.json();
-    if (!tokenData.id_token) return res.redirect(`${CLIENT_URL}?googleAuth=error`);
+    if (!tokenData.id_token)
+      return res.redirect(`${CLIENT_URL}?googleAuth=error`);
 
-    // Send ID token to backend to validate & create JWT
-    const appRes = await fetch(`${process.env.API_URL}/auth/google`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id_token: tokenData.id_token }),
-    });
+    // Send ID token to backend auth processor
+    const appRes = await fetch(
+      `${process.env.API_URL}/auth/google`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id_token: tokenData.id_token }),
+      }
+    );
 
     const appData = await appRes.json();
-    if (!appData.token) return res.redirect(`${CLIENT_URL}?googleAuth=error`);
+    if (!appData.token)
+      return res.redirect(`${CLIENT_URL}?googleAuth=error`);
 
-    // FRONTEND WILL CATCH THESE IN URL
     return res.redirect(
       `${CLIENT_URL}/?token=${appData.token}&user=${encodeURIComponent(
         JSON.stringify(appData.user)
@@ -135,5 +138,11 @@ router.get("/google/callback", async (req, res) => {
    STEP 3 — Backend verifies Google ID token
 --------------------------------------------------------- */
 router.post("/google", googleLogin);
+
+/* --------------------------------------------------------
+   Local Login / Register
+--------------------------------------------------------- */
+router.post("/login", loginUser);
+router.post("/register", registerUser);
 
 export default router;
