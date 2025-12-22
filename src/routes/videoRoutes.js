@@ -425,7 +425,7 @@ router.post(
       // 🔥 AUTO SHORT DETECTION
       const isShort =
         Number(duration) > 0 &&
-        Number(duration) <= 60
+        Number(duration) <= 60;
         // aspectRatio === "9:16";
 
       const videoFile = req.files.video[0];
