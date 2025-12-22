@@ -14,6 +14,7 @@
 //   region: process.env.AWS_REGION,
 // });
 
+
 // // 📤 Upload Video to AWS S3 and save to MongoDB
 // export const uploadVideo = async (req, res) => {
 //   try {
@@ -43,7 +44,7 @@
 //       title,
 //       description: description || "",
 //       videoUrl,
-//       userId: req.user.id, // ✅ fixed to match your model field (userId)
+//       userId: req.user.id,
 //     });
 
 //     return res.status(201).json({
@@ -59,6 +60,7 @@
 //   }
 // };
 
+
 // // 📥 Get All Videos
 // export const getVideos = async (req, res) => {
 //   try {
@@ -69,6 +71,7 @@
 //     res.status(500).json({ error: "Failed to fetch videos" });
 //   }
 // };
+
 
 // // 📥 Get Single Video by ID
 // export const getVideoById = async (req, res) => {
@@ -86,6 +89,7 @@
 //     res.status(500).json({ error: "Server error" });
 //   }
 // };
+
 
 // // 🧹 Cleanup old non-S3 videos
 // export const cleanupOldVideos = async (req, res) => {
@@ -112,13 +116,45 @@
 //   }
 // };
 
+
 // // 👤 Get videos uploaded by the logged-in user
+// // export const getMyVideos = async (req, res) => {
+// //   try {
+// //     if (!req.user || !req.user.id)
+// //       return res.status(401).json({ error: "Unauthorized - user not found" });
+
+// //     const myVideos = await Video.find({ userId: req.user.id }).sort({ createdAt: -1 });
+
+// //     return res.status(200).json({
+// //       success: true,
+// //       count: myVideos.length,
+// //       videos: myVideos,
+// //     });
+// //   } catch (err) {
+// //     console.error("❌ Error fetching user's videos:", err);
+// //     return res.status(500).json({ error: "Failed to fetch your videos" });
+// //   }
+// // };
+
+
+
+
+// //  today updated code 19-11-2025
 // export const getMyVideos = async (req, res) => {
 //   try {
 //     if (!req.user || !req.user.id)
 //       return res.status(401).json({ error: "Unauthorized - user not found" });
 
-//     const myVideos = await Video.find({ userId: req.user.id }).sort({ createdAt: -1 });
+//     let myVideos = await Video.find({ userId: req.user.id })
+//       .sort({ createdAt: -1 })
+//       .lean();
+
+//     // ⭐ Fix undefined fields for old videos
+//     myVideos = myVideos.map(v => ({
+//       ...v,
+//       likeCount: v.likeCount ?? 0,
+//       commentCount: v.commentCount ?? 0,
+//     }));
 
 //     return res.status(200).json({
 //       success: true,
@@ -132,7 +168,84 @@
 // };
 
 
-//  new code 12-11-2025
+
+
+// /* =====================================================
+//    🔍  NEW: Search & Suggestion Endpoints
+//    ===================================================== */
+
+// // 📦 Search videos by title (partial + case-insensitive)
+// export const searchVideos = async (req, res) => {
+//   try {
+//     const { query } = req.params;
+//     if (!query) return res.status(400).json({ error: "Query required" });
+
+//     const normalized = query.toLowerCase().replace(/\s+/g, "");
+
+//     const videos = await Video.find({
+//       $or: [
+//         { title: { $regex: query, $options: "i" } },
+//         { authorName: { $regex: query, $options: "i" } },
+//         {
+//           authorName: {
+//             $regex: new RegExp(normalized.split("").join(".*"), "i")
+//           }
+//         }
+//       ]
+//     });
+
+//     res.json(videos);
+
+//   } catch (err) {
+//     console.error("❌ Search error:", err);
+//     res.status(500).json({ error: "Failed to search videos" });
+//   }
+// };
+
+
+// // 💡 Suggest videos for live search (autocomplete) — DEBUG VERSION
+// export const suggestVideos = async (req, res) => {
+//   try {
+//     const { q } = req.query;
+
+//     // 🔥 ADD THIS LOG HERE
+//     console.log("SUGGEST API HIT:", q);
+
+//     if (!q || q.trim().length === 0) {
+//       return res.status(400).json({ error: "Query required" });
+//     }
+
+//     const normalized = q.toLowerCase().replace(/\s+/g, "");
+
+//     const suggestions = await Video.find({
+//       $or: [
+//         { title: { $regex: q, $options: "i" } },
+//         { authorName: { $regex: q, $options: "i" } },
+//         {
+//           authorName: {
+//             $regex: new RegExp(normalized.split("").join(".*"), "i")
+//           }
+//         }
+//       ]
+//     })
+//       .select("title thumbnailUrl authorName authorAvatar")
+//       .limit(20);
+
+//     // 🔥 SECOND DEBUG
+//     console.log("SUGGESTIONS FOUND:", suggestions.length);
+
+//     return res.json(suggestions);
+
+//   } catch (err) {
+//     console.error("❌ Suggest error:", err);
+//     return res.status(500).json({ error: "Failed to fetch suggestions" });
+//   }
+// };
+
+
+// today code 22/12
+
+
 
 import AWS from "aws-sdk";
 import Video from "../models/Video.js";
@@ -148,17 +261,36 @@ const s3 = new AWS.S3({
   region: process.env.AWS_REGION,
 });
 
-
-// 📤 Upload Video to AWS S3 and save to MongoDB
+/* =====================================================
+   📤 Upload Video / Short (SAME API)
+   ===================================================== */
 export const uploadVideo = async (req, res) => {
   try {
-    const { title, description } = req.body;
+    const {
+      title,
+      description,
+      duration = 0,          // 👈 seconds (frontend / ffmpeg)
+      aspectRatio = "16:9",  // 👈 "9:16" for shorts
+    } = req.body;
+
     const file = req.file;
 
     if (!title) return res.status(400).json({ error: "Title is required" });
     if (!file) return res.status(400).json({ error: "No video file uploaded" });
 
-    const safeFileName = `videos/${Date.now()}-${file.originalname.replace(/\s+/g, "_")}`;
+    // 🔥 AUTO DETECT SHORT
+    const isShort =
+      Number(duration) > 0 &&
+      Number(duration) <= 60 &&
+      aspectRatio === "9:16";
+
+    // 📁 Optional: keep shorts in separate folder
+    const folder = isShort ? "videos/shorts" : "videos/long";
+
+    const safeFileName = `${folder}/${Date.now()}-${file.originalname.replace(
+      /\s+/g,
+      "_"
+    )}`;
 
     const params = {
       Bucket: process.env.S3_BUCKET_NAME,
@@ -179,10 +311,22 @@ export const uploadVideo = async (req, res) => {
       description: description || "",
       videoUrl,
       userId: req.user.id,
+
+      // 🔥 SHORT METADATA
+      isShort,
+      duration: Number(duration),
+      aspectRatio,
+
+      // counters safety
+      likeCount: 0,
+      commentCount: 0,
+      views: 0,
     });
 
     return res.status(201).json({
-      message: "✅ Video uploaded successfully",
+      message: isShort
+        ? "✅ Short uploaded successfully"
+        : "✅ Video uploaded successfully",
       video: newVideo,
     });
   } catch (err) {
@@ -194,8 +338,9 @@ export const uploadVideo = async (req, res) => {
   }
 };
 
-
-// 📥 Get All Videos
+/* =====================================================
+   📥 Get All Videos (NO CHANGE)
+   ===================================================== */
 export const getVideos = async (req, res) => {
   try {
     const videos = await Video.find().sort({ createdAt: -1 });
@@ -206,8 +351,9 @@ export const getVideos = async (req, res) => {
   }
 };
 
-
-// 📥 Get Single Video by ID
+/* =====================================================
+   📥 Get Single Video by ID
+   ===================================================== */
 export const getVideoById = async (req, res) => {
   try {
     const { id } = req.params;
@@ -224,56 +370,9 @@ export const getVideoById = async (req, res) => {
   }
 };
 
-
-// 🧹 Cleanup old non-S3 videos
-export const cleanupOldVideos = async (req, res) => {
-  try {
-    const result = await Video.deleteMany({
-      videoUrl: {
-        $not: {
-          $regex: /^https:\/\/overairstream\.s3\.ap-south-1\.amazonaws\.com/,
-        },
-      },
-    });
-
-    res.json({
-      success: true,
-      deletedCount: result.deletedCount,
-      message: `${result.deletedCount} non-S3 videos deleted successfully`,
-    });
-  } catch (error) {
-    console.error("❌ Error cleaning videos:", error);
-    res.status(500).json({
-      success: false,
-      message: "Server error during cleanup",
-    });
-  }
-};
-
-
-// 👤 Get videos uploaded by the logged-in user
-// export const getMyVideos = async (req, res) => {
-//   try {
-//     if (!req.user || !req.user.id)
-//       return res.status(401).json({ error: "Unauthorized - user not found" });
-
-//     const myVideos = await Video.find({ userId: req.user.id }).sort({ createdAt: -1 });
-
-//     return res.status(200).json({
-//       success: true,
-//       count: myVideos.length,
-//       videos: myVideos,
-//     });
-//   } catch (err) {
-//     console.error("❌ Error fetching user's videos:", err);
-//     return res.status(500).json({ error: "Failed to fetch your videos" });
-//   }
-// };
-
-
-
-
-//  today updated code 19-11-2025
+/* =====================================================
+   👤 Get Logged-in User Videos
+   ===================================================== */
 export const getMyVideos = async (req, res) => {
   try {
     if (!req.user || !req.user.id)
@@ -283,11 +382,12 @@ export const getMyVideos = async (req, res) => {
       .sort({ createdAt: -1 })
       .lean();
 
-    // ⭐ Fix undefined fields for old videos
     myVideos = myVideos.map(v => ({
       ...v,
       likeCount: v.likeCount ?? 0,
       commentCount: v.commentCount ?? 0,
+      views: v.views ?? 0,
+      isShort: v.isShort ?? false,
     }));
 
     return res.status(200).json({
@@ -299,83 +399,31 @@ export const getMyVideos = async (req, res) => {
     console.error("❌ Error fetching user's videos:", err);
     return res.status(500).json({ error: "Failed to fetch your videos" });
   }
+  
 };
-
-
-
-
 /* =====================================================
-   🔍  NEW: Search & Suggestion Endpoints
+   📱 Get Shorts Feed
    ===================================================== */
-
-// 📦 Search videos by title (partial + case-insensitive)
-export const searchVideos = async (req, res) => {
+export const getShorts = async (req, res) => {
   try {
-    const { query } = req.params;
-    if (!query) return res.status(400).json({ error: "Query required" });
+    const shorts = await Video.find({ isShort: true })
+      .sort({ createdAt: -1 })
+      .limit(50)
+      .lean();
 
-    const normalized = query.toLowerCase().replace(/\s+/g, "");
+    const safeShorts = shorts.map(s => ({
+      ...s,
+      likeCount: s.likeCount ?? 0,
+      commentCount: s.commentCount ?? 0,
+      views: s.views ?? 0,
+    }));
 
-    const videos = await Video.find({
-      $or: [
-        { title: { $regex: query, $options: "i" } },
-        { authorName: { $regex: query, $options: "i" } },
-        {
-          authorName: {
-            $regex: new RegExp(normalized.split("").join(".*"), "i")
-          }
-        }
-      ]
-    });
-
-    res.json(videos);
-
+    res.status(200).json(safeShorts);
   } catch (err) {
-    console.error("❌ Search error:", err);
-    res.status(500).json({ error: "Failed to search videos" });
+    console.error("❌ Error fetching shorts:", err);
+    res.status(500).json({ error: "Failed to fetch shorts" });
   }
 };
-
-
-// 💡 Suggest videos for live search (autocomplete) — DEBUG VERSION
-export const suggestVideos = async (req, res) => {
-  try {
-    const { q } = req.query;
-
-    // 🔥 ADD THIS LOG HERE
-    console.log("SUGGEST API HIT:", q);
-
-    if (!q || q.trim().length === 0) {
-      return res.status(400).json({ error: "Query required" });
-    }
-
-    const normalized = q.toLowerCase().replace(/\s+/g, "");
-
-    const suggestions = await Video.find({
-      $or: [
-        { title: { $regex: q, $options: "i" } },
-        { authorName: { $regex: q, $options: "i" } },
-        {
-          authorName: {
-            $regex: new RegExp(normalized.split("").join(".*"), "i")
-          }
-        }
-      ]
-    })
-      .select("title thumbnailUrl authorName authorAvatar")
-      .limit(20);
-
-    // 🔥 SECOND DEBUG
-    console.log("SUGGESTIONS FOUND:", suggestions.length);
-
-    return res.json(suggestions);
-
-  } catch (err) {
-    console.error("❌ Suggest error:", err);
-    return res.status(500).json({ error: "Failed to fetch suggestions" });
-  }
-};
-
 
 
 
