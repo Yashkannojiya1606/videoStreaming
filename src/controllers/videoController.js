@@ -281,8 +281,8 @@ export const uploadVideo = async (req, res) => {
     // 🔥 AUTO DETECT SHORT
     const isShort =
       Number(duration) > 0 &&
-      Number(duration) <= 60 &&
-      aspectRatio === "9:16";
+      Number(duration) <= 60;
+      // aspectRatio === "9:16";
 
     // 📁 Optional: keep shorts in separate folder
     const folder = isShort ? "videos/shorts" : "videos/long";
