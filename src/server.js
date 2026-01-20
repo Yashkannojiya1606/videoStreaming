@@ -207,7 +207,7 @@ const corsOptions = {
     const cleanOrigin = normalize(origin);
     console.log("🔍 Incoming Origin:", cleanOrigin);
 
-    // ✅ allow undefined (Render, Socket.IO, preflight)
+    // ✅ Allow undefined origins (Render, Socket.IO, preflight)
     if (!cleanOrigin) return callback(null, true);
 
     if (allowedOrigins.includes(cleanOrigin)) {
@@ -221,8 +221,16 @@ const corsOptions = {
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
 };
 
+// ✅ Apply CORS globally
 app.use(cors(corsOptions));
-app.options("*", cors(corsOptions));
+
+// ✅ SAFE preflight handling (NO route patterns)
+app.use((req, res, next) => {
+  if (req.method === "OPTIONS") {
+    return cors(corsOptions)(req, res, next);
+  }
+  next();
+});
 
 /* ---------------------------------------------------
    ✅ Body Parsers
@@ -302,7 +310,7 @@ const io = new Server(httpServer, {
       const cleanOrigin = normalize(origin);
       console.log("🔌 Socket Origin:", cleanOrigin);
 
-      // ✅ Always allow socket origin
+      // ✅ Always allow socket connections
       return callback(null, true);
     },
     credentials: true,
@@ -320,7 +328,6 @@ app.set("io", io);
 io.on("connection", (socket) => {
   console.log("🟢 Socket connected:", socket.id);
 
-  // 🎬 Video rooms
   socket.on("joinVideo", (videoId) => {
     socket.join(videoId);
     console.log(`📺 Joined VIDEO-${videoId}`);
@@ -330,7 +337,6 @@ io.on("connection", (socket) => {
     socket.leave(videoId);
   });
 
-  // 👥 Channel rooms (subscriptions)
   socket.on("joinChannelRoom", (channelId) => {
     socket.join(channelId.toString());
     console.log(`👥 Joined CHANNEL-${channelId}`);
