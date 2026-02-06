@@ -187,12 +187,14 @@ import watchlaterRoutes from "./routes/watchlaterRoutes.js";
 import playlistRoutes from "./routes/playlistRoutes.js";
 import trendingRoutes from "./routes/trendingRoutes.js";
 import productRoutes from "./routes/productRoutes.js";
+import liveRoutes from "./routes/liveRoutes.js";
+
 
 const app = express();
 
 /* ---------------------------------------------------
    ✅ CORS — MUST BE FIRST MIDDLEWARE
---------------------------------------------------- */
+------------------------------------------------------ */
 
 const allowedOrigins = [
   "http://localhost:5173",
@@ -245,9 +247,9 @@ app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
 connectDB();
 
-/* ---------------------------------------------------
+/* -----------------------------------------------
    ✅ Static Files
---------------------------------------------------- */
+-------------------------------------------------- */
 
 app.use("/uploads", express.static(path.join(path.resolve(), "uploads")));
 
@@ -266,6 +268,7 @@ app.use("/api/watchlater", watchlaterRoutes);
 app.use("/api/playlists", playlistRoutes);
 app.use("/api/trending", trendingRoutes);
 app.use("/api/products", productRoutes);
+app.use("/api/live", liveRoutes);
 
 /* ---------------------------------------------------
    ✅ Health Checks
