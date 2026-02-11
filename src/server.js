@@ -270,16 +270,16 @@ app.use("/api/trending", trendingRoutes);
 app.use("/api/products", productRoutes);
 app.use("/api/live", liveRoutes);
 
-/* ---------------------------------------------------
+/* --------------------
    ✅ Health Checks
---------------------------------------------------- */
+---------------------- */
 
 app.get("/", (req, res) => res.send("API is running..."));
 app.get("/health", (req, res) => res.json({ ok: true }));
 
 /* ---------------------------------------------------
    ✅ 404 Handler
---------------------------------------------------- */
+------------------------------------------------------ */
 
 app.use((req, res) => {
   res.status(404).json({ message: "Route not found" });
