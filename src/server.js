@@ -409,13 +409,14 @@ io.on("connection", (socket) => {
     io.to(liveId).emit("viewerCount", viewerCount);
   });
 
-  socket.on("sendMessage", ({ liveId, message }) => {
-    io.to(liveId).emit("newMessage", {
-      id: Date.now(),
-      message,
-      user: socket.id,
-    });
+  socket.on("sendMessage", ({ liveId, message, username, avatar }) => {
+  io.to(liveId).emit("newMessage", {
+    id: Date.now(),
+    message,
+    username,
+    avatar,
   });
+});
 
   socket.on("sendReaction", ({ liveId, emoji }) => {
     io.to(liveId).emit("newReaction", {
