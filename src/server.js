@@ -216,7 +216,8 @@ import { createServer } from "http";
 import { Server } from "socket.io";
 import connectDB from "./config/db.js";
 
-// Routes
+/* ================= ROUTES ================= */
+
 import authRoutes from "./routes/authRoutes.js";
 import videoRoutes from "./routes/videoRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
@@ -232,9 +233,9 @@ import liveRoutes from "./routes/liveRoutes.js";
 
 const app = express();
 
-/* ---------------------------------------------------
+/* ===================================================
    ✅ CORS
---------------------------------------------------- */
+=================================================== */
 
 const allowedOrigins = [
   "http://localhost:5173",
@@ -247,51 +248,41 @@ const normalize = (origin) => origin?.replace(/\/$/, "");
 const corsOptions = {
   origin: (origin, callback) => {
     const cleanOrigin = normalize(origin);
-    console.log("🔍 Incoming Origin:", cleanOrigin);
 
     if (!cleanOrigin) return callback(null, true);
     if (allowedOrigins.includes(cleanOrigin)) {
       return callback(null, true);
     }
 
-    console.warn("❌ CORS Blocked:", cleanOrigin);
     return callback(null, true);
   },
   credentials: true,
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
 };
 
 app.use(cors(corsOptions));
 
-app.use((req, res, next) => {
-  if (req.method === "OPTIONS") {
-    return cors(corsOptions)(req, res, next);
-  }
-  next();
-});
-
-/* ---------------------------------------------------
-   ✅ Body Parsers
---------------------------------------------------- */
+/* ===================================================
+   ✅ BODY PARSER
+=================================================== */
 
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
-/* ---------------------------------------------------
-   ✅ Database
---------------------------------------------------- */
+/* ===================================================
+   ✅ DATABASE
+=================================================== */
 
 connectDB();
 
-/* ---------------------------------------------------
-   ✅ Static
---------------------------------------------------- */
+/* ===================================================
+   ✅ STATIC
+=================================================== */
 
 app.use("/uploads", express.static(path.join(path.resolve(), "uploads")));
 
-/* ---------------------------------------------------
-   ✅ Routes
---------------------------------------------------- */
+/* ===================================================
+   ✅ API ROUTES
+=================================================== */
 
 app.use("/api/auth", authRoutes);
 app.use("/api/videos", videoRoutes);
@@ -306,117 +297,133 @@ app.use("/api/trending", trendingRoutes);
 app.use("/api/products", productRoutes);
 app.use("/api/live", liveRoutes);
 
-/* ---------------------------------------------------
-   ✅ Health
---------------------------------------------------- */
+/* ===================================================
+   ✅ HEALTH
+=================================================== */
 
 app.get("/", (req, res) => res.send("API is running..."));
 app.get("/health", (req, res) => res.json({ ok: true }));
 
-/* ---------------------------------------------------
-   ✅ 404
---------------------------------------------------- */
+/* ===================================================
+   ✅ ERROR HANDLING
+=================================================== */
 
 app.use((req, res) => {
   res.status(404).json({ message: "Route not found" });
 });
 
-/* ---------------------------------------------------
-   ✅ Global Error
---------------------------------------------------- */
-
 app.use((err, req, res, next) => {
   console.error("🔥 Global Error:", err.message);
-
-  res.header("Access-Control-Allow-Origin", req.headers.origin || "*");
-  res.header("Access-Control-Allow-Credentials", "true");
-
   res.status(500).json({
     message: "Internal Server Error",
     error: err.message,
   });
 });
 
-/* ---------------------------------------------------
-   ✅ HTTP + Socket.IO
---------------------------------------------------- */
+/* ===================================================
+   ✅ HTTP + SOCKET.IO
+=================================================== */
 
 const httpServer = createServer(app);
 
 const io = new Server(httpServer, {
   cors: {
-    origin: (origin, callback) => {
-      const cleanOrigin = normalize(origin);
-      console.log("🔌 Socket Origin:", cleanOrigin);
-      return callback(null, true);
-    },
+    origin: true,
     credentials: true,
-    methods: ["GET", "POST"],
   },
 });
 
 app.set("io", io);
 
-/* ---------------------------------------------------
+/* ===================================================
+   🔴 LIVE ROOM VIEWER TRACKER
+=================================================== */
+
+const liveRoomViewers = {}; 
+// structure:
+// {
+//   liveId: {
+//     socketId: { username }
+//   }
+// }
+
+/* ===================================================
    ✅ SOCKET EVENTS
---------------------------------------------------- */
+=================================================== */
 
 io.on("connection", (socket) => {
   console.log("🟢 Socket connected:", socket.id);
 
-  /* --------------------------
-     🎥 Existing Rooms
-  -------------------------- */
+  /* ==========================================
+        🔴 JOIN LIVE ROOM
+  ========================================== */
 
-  socket.on("joinVideo", (videoId) => {
-    socket.join(videoId);
-  });
-
-  socket.on("leaveVideo", (videoId) => {
-    socket.leave(videoId);
-  });
-
-  socket.on("joinChannelRoom", (channelId) => {
-    socket.join(channelId.toString());
-  });
-
-  socket.on("leaveChannelRoom", (channelId) => {
-    socket.leave(channelId.toString());
-  });
-
-  /* ===============================
-        🔴 LIVE STREAM SOCKETS
-  =============================== */
-
-  socket.on("joinLiveRoom", (liveId) => {
+  socket.on("joinLiveRoom", ({ liveId, username }) => {
     socket.join(liveId);
     socket.liveRoomId = liveId;
+    socket.username = username || "User";
 
-    const viewerCount =
-      io.sockets.adapter.rooms.get(liveId)?.size || 1;
+    if (!liveRoomViewers[liveId]) {
+      liveRoomViewers[liveId] = {};
+    }
 
+    liveRoomViewers[liveId][socket.id] = {
+      username: socket.username,
+    };
+
+    const viewerCount = Object.keys(liveRoomViewers[liveId]).length;
+
+    /* 🔥 Emit viewer count */
     io.to(liveId).emit("viewerCount", viewerCount);
 
-    console.log(`🔴 Joined LIVE-${liveId}`);
+    /* 🔥 Emit join notification */
+    io.to(liveId).emit("userJoined", {
+      username: socket.username,
+      count: viewerCount,
+    });
+
+    console.log(`🔴 ${socket.username} joined LIVE-${liveId}`);
   });
+
+  /* ==========================================
+        🔴 LEAVE LIVE ROOM
+  ========================================== */
 
   socket.on("leaveLiveRoom", (liveId) => {
     socket.leave(liveId);
 
-    const viewerCount =
-      io.sockets.adapter.rooms.get(liveId)?.size || 0;
+    if (liveRoomViewers[liveId]) {
+      const username = liveRoomViewers[liveId][socket.id]?.username;
+      delete liveRoomViewers[liveId][socket.id];
 
-    io.to(liveId).emit("viewerCount", viewerCount);
+      const viewerCount = Object.keys(liveRoomViewers[liveId]).length;
+
+      io.to(liveId).emit("viewerCount", viewerCount);
+
+      /* 🔥 Emit leave notification */
+      io.to(liveId).emit("userLeft", {
+        username,
+        count: viewerCount,
+      });
+    }
   });
+
+  /* ==========================================
+        💬 CHAT
+  ========================================== */
 
   socket.on("sendMessage", ({ liveId, message, username, avatar }) => {
-  io.to(liveId).emit("newMessage", {
-    id: Date.now(),
-    message,
-    username,
-    avatar,
+    io.to(liveId).emit("newMessage", {
+      id: Date.now(),
+      message,
+      username,
+      avatar,
+    });
   });
-});
+
+  /* ==========================================
+        ❤️ REACTIONS
+  ========================================== */
 
   socket.on("sendReaction", ({ liveId, emoji }) => {
     io.to(liveId).emit("newReaction", {
@@ -425,6 +432,10 @@ io.on("connection", (socket) => {
     });
   });
 
+  /* ==========================================
+        🎁 GIFTS
+  ========================================== */
+
   socket.on("sendGift", ({ liveId, gift }) => {
     io.to(liveId).emit("newGift", {
       id: Date.now(),
@@ -432,32 +443,55 @@ io.on("connection", (socket) => {
     });
   });
 
+  /* ==========================================
+        📌 PIN MESSAGE
+  ========================================== */
+
   socket.on("pinMessage", ({ liveId, message }) => {
     io.to(liveId).emit("pinnedMessage", message);
   });
 
+  /* ==========================================
+        🛑 END LIVE
+  ========================================== */
+
   socket.on("endLive", (liveId) => {
     io.to(liveId).emit("liveEnded");
+
+    delete liveRoomViewers[liveId];
+
     console.log(`🛑 LIVE ENDED - ${liveId}`);
   });
 
+  /* ==========================================
+        🔌 DISCONNECT
+  ========================================== */
+
   socket.on("disconnect", () => {
-    console.log("🔴 Socket disconnected:", socket.id);
+    const liveId = socket.liveRoomId;
 
-    if (socket.liveRoomId) {
-      const liveId = socket.liveRoomId;
+    if (liveId && liveRoomViewers[liveId]) {
+      const username = liveRoomViewers[liveId][socket.id]?.username;
 
-      const viewerCount =
-        io.sockets.adapter.rooms.get(liveId)?.size || 0;
+      delete liveRoomViewers[liveId][socket.id];
+
+      const viewerCount = Object.keys(liveRoomViewers[liveId]).length;
 
       io.to(liveId).emit("viewerCount", viewerCount);
+
+      io.to(liveId).emit("userLeft", {
+        username,
+        count: viewerCount,
+      });
     }
+
+    console.log("🔴 Socket disconnected:", socket.id);
   });
 });
 
-/* ---------------------------------------------------
-   ✅ Start Server
---------------------------------------------------- */
+/* ===================================================
+   ✅ START SERVER
+=================================================== */
 
 const PORT = process.env.PORT || 5000;
 
