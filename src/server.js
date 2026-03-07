@@ -230,6 +230,7 @@ import playlistRoutes from "./routes/playlistRoutes.js";
 import trendingRoutes from "./routes/trendingRoutes.js";
 import productRoutes from "./routes/productRoutes.js";
 import liveRoutes from "./routes/liveRoutes.js";
+import reportRoutes from "./routes/reportRoutes.js";
 
 const app = express();
 
@@ -296,6 +297,7 @@ app.use("/api/playlists", playlistRoutes);
 app.use("/api/trending", trendingRoutes);
 app.use("/api/products", productRoutes);
 app.use("/api/live", liveRoutes);
+app.use("/api/report", reportRoutes);
 
 /* ===================================================
    ✅ HEALTH
