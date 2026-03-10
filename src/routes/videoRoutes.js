@@ -374,9 +374,27 @@ const router = express.Router();
 
 // 🧩 Multer setup
 const storage = multer.memoryStorage();
+// const upload = multer({
+//   storage,
+//   limits: { fileSize: 1024 * 1024 * 1024 },
+//   fileFilter: (req, file, cb) => {
+//     if (file.fieldname === "video" && file.mimetype.startsWith("video/"))
+//       cb(null, true);
+//     else if (
+//       file.fieldname === "thumbnail" &&
+//       (file.mimetype.startsWith("image/") ||
+//         file.mimetype === "image/jpeg" ||
+//         file.mimetype === "image/png")
+//     )
+//       cb(null, true);
+//     else cb(new Error("Invalid file type"), false);
+//   },
+// });
+
+
 const upload = multer({
   storage,
-  limits: { fileSize: 100 * 1024 * 1024 },
+  limits: { fileSize: 1024 * 1024 * 1024 }, // ✅ 1GB
   fileFilter: (req, file, cb) => {
     if (file.fieldname === "video" && file.mimetype.startsWith("video/"))
       cb(null, true);
@@ -390,6 +408,7 @@ const upload = multer({
     else cb(new Error("Invalid file type"), false);
   },
 });
+
 
 // ✅ Upload video + thumbnail (protected)
 router.post(
