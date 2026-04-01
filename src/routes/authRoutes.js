@@ -143,15 +143,70 @@ router.get("/google", (req, res) => {
 /* --------------------------------------------------------
    STEP 2 — Google redirects BACK with "code"
 --------------------------------------------------------- */
+// router.get("/google/callback", async (req, res) => {
+//   const CLIENT_URL = getClientURL(req);
+
+//   try {
+//     const { code } = req.query;
+
+//     if (!code) {
+//       return res.redirect(`${CLIENT_URL}?googleAuth=error`);
+//     }
+
+//     // Exchange code → id_token
+//     const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
+//       method: "POST",
+//       headers: { "Content-Type": "application/x-www-form-urlencoded" },
+//       body: new URLSearchParams({
+//         code,
+//         client_id: process.env.GOOGLE_CLIENT_ID,
+//         client_secret: process.env.GOOGLE_CLIENT_SECRET,
+//         redirect_uri: process.env.GOOGLE_REDIRECT_URI,
+//         grant_type: "authorization_code",
+//       }),
+//     });
+
+//     const tokenData = await tokenRes.json();
+
+//     if (!tokenData.id_token) {
+//       console.log("❌ No ID Token:", tokenData);
+//       return res.redirect(`${CLIENT_URL}?googleAuth=error`);
+//     }
+
+//     // ✅ DIRECT CALL (NO fetch)
+//     const result = await googleLogin(tokenData.id_token);
+
+//     if (!result || !result.token) {
+//       console.log("❌ googleLogin failed:", result);
+//       return res.redirect(`${CLIENT_URL}?googleAuth=error`);
+//     }
+
+//     // ✅ SUCCESS REDIRECT
+//     return res.redirect(
+//       `${CLIENT_URL}/?token=${result.token}&user=${encodeURIComponent(
+//         JSON.stringify(result.user)
+//       )}`
+//     );
+//   } catch (err) {
+//     console.error("GOOGLE AUTH ERROR:", err);
+//     return res.redirect(`${CLIENT_URL}?googleAuth=error`);
+//   }
+// });
 router.get("/google/callback", async (req, res) => {
   const CLIENT_URL = getClientURL(req);
+
+  console.log("🔥 CALLBACK HIT");
+  console.log("👉 Query:", req.query);
 
   try {
     const { code } = req.query;
 
     if (!code) {
+      console.log("❌ No code received");
       return res.redirect(`${CLIENT_URL}?googleAuth=error`);
     }
+
+    console.log("✅ Code received:", code);
 
     // Exchange code → id_token
     const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
@@ -168,31 +223,37 @@ router.get("/google/callback", async (req, res) => {
 
     const tokenData = await tokenRes.json();
 
+    console.log("🔍 Google Token Response:", tokenData);
+
     if (!tokenData.id_token) {
-      console.log("❌ No ID Token:", tokenData);
+      console.log("❌ ID TOKEN MISSING");
       return res.redirect(`${CLIENT_URL}?googleAuth=error`);
     }
 
-    // ✅ DIRECT CALL (NO fetch)
+    console.log("✅ ID Token received");
+
+    // Call controller
     const result = await googleLogin(tokenData.id_token);
 
+    console.log("🔍 googleLogin result:", result);
+
     if (!result || !result.token) {
-      console.log("❌ googleLogin failed:", result);
+      console.log("❌ Token generation failed");
       return res.redirect(`${CLIENT_URL}?googleAuth=error`);
     }
 
-    // ✅ SUCCESS REDIRECT
+    console.log("✅ SUCCESS — Redirecting to frontend");
+
     return res.redirect(
       `${CLIENT_URL}/?token=${result.token}&user=${encodeURIComponent(
         JSON.stringify(result.user)
       )}`
     );
   } catch (err) {
-    console.error("GOOGLE AUTH ERROR:", err);
+    console.error("💥 GOOGLE AUTH ERROR:", err);
     return res.redirect(`${CLIENT_URL}?googleAuth=error`);
   }
 });
-
 /* --------------------------------------------------------
    STEP 3 — Backend verifies Google ID token (API use)
 --------------------------------------------------------- */
