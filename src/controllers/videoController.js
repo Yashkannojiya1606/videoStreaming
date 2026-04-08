@@ -312,7 +312,23 @@ export const uploadVideo = async (req, res) => {
    ===================================================== */
 export const getVideos = async (req, res) => {
   try {
-    const videos = await Video.find().sort({ createdAt: -1 });
+    const { limit, exclude } = req.query;
+
+    const query = {};
+    if (exclude && mongoose.Types.ObjectId.isValid(exclude)) {
+      query._id = { $ne: exclude };
+    }
+
+    let videosQuery = Video.find(query).select("-__v").sort({ createdAt: -1 });
+
+    if (limit) {
+      const parsedLimit = parseInt(limit, 10);
+      if (!isNaN(parsedLimit) && parsedLimit > 0) {
+        videosQuery = videosQuery.limit(parsedLimit);
+      }
+    }
+
+    const videos = await videosQuery.lean();
     res.json(videos);
   } catch (err) {
     console.error("❌ Error fetching videos:", err);
