@@ -312,21 +312,21 @@ export const uploadVideo = async (req, res) => {
    ===================================================== */
 export const getVideos = async (req, res) => {
   try {
-    const { limit, exclude } = req.query;
+    const { limit = 50, exclude, page = 1 } = req.query;
 
     const query = {};
     if (exclude && mongoose.Types.ObjectId.isValid(exclude)) {
       query._id = { $ne: exclude };
     }
 
-    let videosQuery = Video.find(query).select("-__v").sort({ createdAt: -1 });
+    const skipAmount = (parseInt(page, 10) - 1) * parseInt(limit, 10);
+    const limitAmount = parseInt(limit, 10);
 
-    if (limit) {
-      const parsedLimit = parseInt(limit, 10);
-      if (!isNaN(parsedLimit) && parsedLimit > 0) {
-        videosQuery = videosQuery.limit(parsedLimit);
-      }
-    }
+    let videosQuery = Video.find(query)
+      .select("-__v")
+      .sort({ createdAt: -1 })
+      .skip(skipAmount)
+      .limit(limitAmount);
 
     const videos = await videosQuery.lean();
     res.json(videos);

@@ -219,16 +219,20 @@ await Video.findByIdAndUpdate(videoId, {
   }
 };
 
-// ✅ Get all comments for a video (sorted)
 export const getComments = async (req, res) => {
   try {
     const videoId = req.params.id;
-    const { sort } = req.query;
+    const { sort, limit = 50, page = 1 } = req.query;
 
     const sortOption = sort === "oldest" ? { createdAt: 1 } : { createdAt: -1 };
+    
+    const skipAmount = (parseInt(page, 10) - 1) * parseInt(limit, 10);
+    const limitAmount = parseInt(limit, 10);
 
     const comments = await Comment.find({ videoId })
       .sort(sortOption)
+      .skip(skipAmount)
+      .limit(limitAmount)
       .populate("userId", "name username avatar");
 
     res.status(200).json(comments);
