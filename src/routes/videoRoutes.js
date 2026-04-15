@@ -533,10 +533,11 @@ router.get("/shorts", async (req, res) => {
 // 🧹 Cleanup
 router.delete("/cleanup", async (req, res) => {
   try {
+    const s3UrlPattern = new RegExp(`^https://${process.env.S3_BUCKET_NAME}\\.s3\\.${process.env.AWS_REGION}\\.amazonaws\\.com`);
     const result = await Video.deleteMany({
       videoUrl: {
         $not: {
-          $regex: /^https:\/\/overairstream\.s3\.ap-south-1\.amazonaws\.com/,
+          $regex: s3UrlPattern,
         },
       },
     });

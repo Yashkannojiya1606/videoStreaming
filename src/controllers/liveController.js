@@ -19,11 +19,17 @@ export const startLive = async (req, res) => {
     }
 
     // 2️⃣ Create IVS Channel
-    const command = new CreateChannelCommand({
+    const commandParams = {
       name: `live_${userId}`,
       latencyMode: "LOW",
       authorized: false
-    });
+    };
+
+    if (process.env.IVS_RECORDING_CONFIG_ARN) {
+      commandParams.recordingConfigurationArn = process.env.IVS_RECORDING_CONFIG_ARN;
+    }
+
+    const command = new CreateChannelCommand(commandParams);
 
     const response = await ivsClient.send(command);
 
